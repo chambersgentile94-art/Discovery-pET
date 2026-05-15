@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../widgets/home_action_card.dart';
 import 'adoption_screen.dart';
 import 'map_screen.dart';
+import 'my_reports_screen.dart';
 import 'profile_screen.dart';
 import 'report_form_screen.dart';
 
@@ -25,6 +26,12 @@ class HomeScreen extends StatelessWidget {
         title: 'Reportar animal',
         description: 'Publicar una mascota perdida, abandonada o vista en la calle.',
         onTap: () => Navigator.pushNamed(context, ReportFormScreen.routeName),
+      ),
+      HomeActionCard(
+        icon: Icons.assignment_ind,
+        title: 'Mis reportes',
+        description: 'Revisar, cerrar o dar seguimiento a los casos que publicaste.',
+        onTap: () => Navigator.pushNamed(context, MyReportsScreen.routeName),
       ),
       HomeActionCard(
         icon: Icons.favorite,
