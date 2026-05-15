@@ -1,29 +1,30 @@
 class AppConfig {
   const AppConfig({
-    required this.supabaseUrl,
-    required this.supabaseAnonKey,
-    required this.googleMapsApiKey,
+    required this.backendUrl,
+    required this.backendPublicKey,
+    required this.mapsKey,
   });
 
-  final String supabaseUrl;
-  final String supabaseAnonKey;
-  final String googleMapsApiKey;
+  const AppConfig.fromEnvironment()
+      : backendUrl = const String.fromEnvironment('DP_BACKEND_URL'),
+        backendPublicKey = const String.fromEnvironment('DP_BACKEND_PUBLIC_KEY'),
+        mapsKey = const String.fromEnvironment('DP_MAPS_KEY');
 
-  bool get hasSupabaseConfig {
-    return supabaseUrl.isNotEmpty &&
-        supabaseAnonKey.isNotEmpty &&
-        !supabaseUrl.contains('TU-PROYECTO') &&
-        !supabaseAnonKey.contains('TU_PUBLIC_ANON_KEY');
+  final String backendUrl;
+  final String backendPublicKey;
+  final String mapsKey;
+
+  bool get hasBackendConfig {
+    return backendUrl.isNotEmpty && backendPublicKey.isNotEmpty;
   }
 
-  bool get hasGoogleMapsConfig {
-    return googleMapsApiKey.isNotEmpty &&
-        !googleMapsApiKey.contains('TU_GOOGLE_MAPS_API_KEY');
+  bool get hasMapsConfig {
+    return mapsKey.isNotEmpty;
   }
 
   static const empty = AppConfig(
-    supabaseUrl: '',
-    supabaseAnonKey: '',
-    googleMapsApiKey: '',
+    backendUrl: '',
+    backendPublicKey: '',
+    mapsKey: '',
   );
 }
