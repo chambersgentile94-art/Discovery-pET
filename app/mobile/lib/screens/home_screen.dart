@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../widgets/home_action_card.dart';
 import 'adoption_screen.dart';
 import 'map_screen.dart';
+import 'moderation_screen.dart';
 import 'my_reports_screen.dart';
 import 'profile_screen.dart';
 import 'report_form_screen.dart';
@@ -38,6 +39,12 @@ class HomeScreen extends StatelessWidget {
         title: 'Adopciones',
         description: 'Ver animales disponibles para adoptar.',
         onTap: () => Navigator.pushNamed(context, AdoptionScreen.routeName),
+      ),
+      HomeActionCard(
+        icon: Icons.admin_panel_settings,
+        title: 'Moderación',
+        description: 'Revisar denuncias de publicaciones y ocultar reportes inválidos.',
+        onTap: () => Navigator.pushNamed(context, ModerationScreen.routeName),
       ),
       HomeActionCard(
         icon: Icons.person,
