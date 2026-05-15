@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/animal_report.dart';
+import '../models/report_update.dart';
 
 class SupabaseService {
   SupabaseService({SupabaseClient? client})
@@ -35,6 +36,44 @@ class SupabaseService {
         .single();
 
     return response['id'] as String;
+  }
+
+  Future<void> updateReportStatus({
+    required String reportId,
+    required String status,
+  }) async {
+    await _client
+        .from('animal_reports')
+        .update({'status': status})
+        .eq('id', reportId);
+  }
+
+  Future<List<ReportUpdate>> fetchReportUpdates(String reportId) async {
+    final response = await _client
+        .from('report_updates')
+        .select()
+        .eq('report_id', reportId)
+        .order('created_at', ascending: false);
+
+    return response
+        .map<ReportUpdate>((item) => ReportUpdate.fromMap(item))
+        .toList();
+  }
+
+  Future<void> createReportUpdate({
+    required String reportId,
+    required String userId,
+    required String comment,
+    String? oldStatus,
+    String? newStatus,
+  }) async {
+    await _client.from('report_updates').insert({
+      'report_id': reportId,
+      'user_id': userId,
+      'comment': comment,
+      'old_status': oldStatus,
+      'new_status': newStatus,
+    });
   }
 
   Future<String> uploadReportImage({
