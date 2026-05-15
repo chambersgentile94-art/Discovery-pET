@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import '../models/animal_report.dart';
 import '../services/supabase_service.dart';
 import '../widgets/report_card.dart';
+import 'report_detail_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({
@@ -54,7 +55,17 @@ class _MapScreenState extends State<MapScreen> {
     return Colors.deepPurple;
   }
 
-  void _showReportDetail(AnimalReport report) {
+  Future<void> _openReportDetail(AnimalReport report) async {
+    await Navigator.pushNamed(
+      context,
+      ReportDetailScreen.routeName,
+      arguments: report,
+    );
+    if (!mounted) return;
+    await _refresh();
+  }
+
+  void _showReportPreview(AnimalReport report) {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -64,7 +75,23 @@ class _MapScreenState extends State<MapScreen> {
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: SingleChildScrollView(
-              child: ReportCard(report: report),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ReportCard(report: report),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _openReportDetail(report);
+                      },
+                      icon: const Icon(Icons.open_in_new),
+                      label: const Text('Abrir seguimiento'),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -98,7 +125,7 @@ class _MapScreenState extends State<MapScreen> {
                   width: 46,
                   height: 46,
                   child: GestureDetector(
-                    onTap: () => _showReportDetail(report),
+                    onTap: () => _showReportPreview(report),
                     child: Icon(
                       Icons.location_on,
                       color: _markerColor(report),
@@ -237,7 +264,12 @@ class _MapScreenState extends State<MapScreen> {
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 12),
-                      ...reports.map((report) => ReportCard(report: report)),
+                      ...reports.map(
+                        (report) => ReportCard(
+                          report: report,
+                          onTap: () => _openReportDetail(report),
+                        ),
+                      ),
                     ],
                   );
                 },
