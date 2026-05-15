@@ -17,12 +17,14 @@ class ReportDetailScreen extends StatefulWidget {
 
 class _ReportDetailScreenState extends State<ReportDetailScreen> {
   final _commentController = TextEditingController();
+  final _flagReasonController = TextEditingController();
   final _service = SupabaseService();
 
   AnimalReport? _report;
   late Future<List<ReportUpdate>> _updatesFuture;
   String? _selectedStatus;
   bool _isSaving = false;
+  bool _isFlagging = false;
 
   static const _statuses = [
     'reported',
@@ -54,6 +56,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   @override
   void dispose() {
     _commentController.dispose();
+    _flagReasonController.dispose();
     super.dispose();
   }
 
@@ -133,19 +136,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
 
       _commentController.clear();
       setState(() {
-        _report = AnimalReport(
-          id: report.id,
-          animalType: report.animalType,
-          category: report.category,
-          title: report.title,
-          description: report.description,
-          status: newStatus,
-          urgency: report.urgency,
-          latitude: report.latitude,
-          longitude: report.longitude,
-          approximateAddress: report.approximateAddress,
-          mainImageUrl: report.mainImageUrl,
-        );
+        _report = report.copyWith(status: newStatus);
         _updatesFuture = _service.fetchReportUpdates(report.id!);
       });
 
@@ -160,6 +151,83 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
       );
     } finally {
       if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _showFlagDialog() async {
+    _flagReasonController.clear();
+
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Reportar publicación'),
+          content: TextField(
+            controller: _flagReasonController,
+            minLines: 3,
+            maxLines: 5,
+            decoration: const InputDecoration(
+              labelText: 'Motivo',
+              hintText: 'Ej: información falsa, duplicado, imagen incorrecta...',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                final value = _flagReasonController.text.trim();
+                if (value.isEmpty) return;
+                Navigator.pop(context, value);
+              },
+              icon: const Icon(Icons.flag),
+              label: const Text('Enviar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (reason == null || reason.trim().isEmpty) return;
+    await _flagReport(reason.trim());
+  }
+
+  Future<void> _flagReport(String reason) async {
+    final report = _report;
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (report == null || report.id == null) return;
+
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tenés que iniciar sesión para reportar una publicación.')),
+      );
+      return;
+    }
+
+    setState(() => _isFlagging = true);
+
+    try {
+      await _service.flagReport(
+        reportId: report.id!,
+        userId: user.id,
+        reason: reason,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Publicación reportada para revisión.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo reportar la publicación: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _isFlagging = false);
     }
   }
 
@@ -178,6 +246,11 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
       appBar: AppBar(
         title: const Text('Detalle del reporte'),
         actions: [
+          IconButton(
+            onPressed: _isFlagging ? null : _showFlagDialog,
+            icon: const Icon(Icons.flag_outlined),
+            tooltip: 'Reportar publicación',
+          ),
           IconButton(
             onPressed: _refreshUpdates,
             icon: const Icon(Icons.refresh),
@@ -247,6 +320,12 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                   ],
                 ),
               ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _isFlagging ? null : _showFlagDialog,
+              icon: const Icon(Icons.flag_outlined),
+              label: const Text('Reportar publicación inválida'),
             ),
             const SizedBox(height: 18),
             const Text(
