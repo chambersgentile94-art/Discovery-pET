@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/animal_report.dart';
 import '../services/supabase_service.dart';
 import '../widgets/report_card.dart';
+import 'report_detail_screen.dart';
 
 class AdoptionScreen extends StatefulWidget {
   const AdoptionScreen({
@@ -36,6 +37,16 @@ class _AdoptionScreenState extends State<AdoptionScreen> {
   Future<void> _refresh() async {
     setState(() => _reportsFuture = _loadReports());
     await _reportsFuture;
+  }
+
+  Future<void> _openReportDetail(AnimalReport report) async {
+    await Navigator.pushNamed(
+      context,
+      ReportDetailScreen.routeName,
+      arguments: report,
+    );
+    if (!mounted) return;
+    await _refresh();
   }
 
   @override
@@ -108,7 +119,12 @@ class _AdoptionScreenState extends State<AdoptionScreen> {
 
                   return Column(
                     children: reports
-                        .map((report) => ReportCard(report: report))
+                        .map(
+                          (report) => ReportCard(
+                            report: report,
+                            onTap: () => _openReportDetail(report),
+                          ),
+                        )
                         .toList(),
                   );
                 },
