@@ -6,6 +6,7 @@ import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/report_detail_screen.dart';
 import 'screens/report_form_screen.dart';
 
 class DiscoveryPetApp extends StatelessWidget {
@@ -33,6 +34,7 @@ class DiscoveryPetApp extends StatelessWidget {
         AuthScreen.routeName: (_) => AuthScreen(isBackendConfigured: config.hasBackendConfig),
         MapScreen.routeName: (_) => MapScreen(isBackendConfigured: config.hasBackendConfig),
         ReportFormScreen.routeName: (_) => const ReportFormScreen(),
+        ReportDetailScreen.routeName: (_) => const ReportDetailScreen(),
         AdoptionScreen.routeName: (_) => AdoptionScreen(isBackendConfigured: config.hasBackendConfig),
         ProfileScreen.routeName: (_) => ProfileScreen(isBackendConfigured: config.hasBackendConfig),
       },
