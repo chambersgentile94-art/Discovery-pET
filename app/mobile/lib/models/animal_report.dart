@@ -1,6 +1,6 @@
 class AnimalReport {
   const AnimalReport({
-    required this.id,
+    this.id,
     required this.animalType,
     required this.category,
     required this.title,
@@ -12,7 +12,7 @@ class AnimalReport {
     this.approximateAddress,
   });
 
-  final String id;
+  final String? id;
   final String animalType;
   final String category;
   final String title;
@@ -25,7 +25,7 @@ class AnimalReport {
 
   factory AnimalReport.fromMap(Map<String, dynamic> map) {
     return AnimalReport(
-      id: map['id'] as String,
+      id: map['id'] as String?,
       animalType: map['animal_type'] as String,
       category: map['category'] as String,
       title: map['title'] as String,
