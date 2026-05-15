@@ -24,6 +24,10 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   late Future<List<AnimalReport>> _reportsFuture;
 
+  String _animalFilter = 'all';
+  String _categoryFilter = 'all';
+  String _urgencyFilter = 'all';
+
   @override
   void initState() {
     super.initState();
@@ -38,6 +42,23 @@ class _MapScreenState extends State<MapScreen> {
   Future<void> _refresh() async {
     setState(() => _reportsFuture = _loadReports());
     await _reportsFuture;
+  }
+
+  List<AnimalReport> _applyFilters(List<AnimalReport> reports) {
+    return reports.where((report) {
+      final matchesAnimal = _animalFilter == 'all' || report.animalType == _animalFilter;
+      final matchesCategory = _categoryFilter == 'all' || report.category == _categoryFilter;
+      final matchesUrgency = _urgencyFilter == 'all' || report.urgency == _urgencyFilter;
+      return matchesAnimal && matchesCategory && matchesUrgency;
+    }).toList();
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _animalFilter = 'all';
+      _categoryFilter = 'all';
+      _urgencyFilter = 'all';
+    });
   }
 
   LatLng _initialCenter(List<AnimalReport> reports) {
@@ -146,6 +167,82 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  Widget _buildFilters() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Filtros',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _clearFilters,
+                  icon: const Icon(Icons.filter_alt_off),
+                  label: const Text('Limpiar'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _animalFilter,
+              decoration: const InputDecoration(
+                labelText: 'Animal',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'all', child: Text('Todos')),
+                DropdownMenuItem(value: 'dog', child: Text('Perros')),
+                DropdownMenuItem(value: 'cat', child: Text('Gatos')),
+                DropdownMenuItem(value: 'other', child: Text('Otros')),
+              ],
+              onChanged: (value) => setState(() => _animalFilter = value ?? 'all'),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _categoryFilter,
+              decoration: const InputDecoration(
+                labelText: 'Categoría',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'all', child: Text('Todas')),
+                DropdownMenuItem(value: 'lost', child: Text('Perdidos')),
+                DropdownMenuItem(value: 'seen', child: Text('Vistos')),
+                DropdownMenuItem(value: 'abandoned', child: Text('Abandonados')),
+                DropdownMenuItem(value: 'rescued', child: Text('Resguardados')),
+                DropdownMenuItem(value: 'adoption', child: Text('En adopción')),
+                DropdownMenuItem(value: 'injured', child: Text('Heridos')),
+              ],
+              onChanged: (value) => setState(() => _categoryFilter = value ?? 'all'),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _urgencyFilter,
+              decoration: const InputDecoration(
+                labelText: 'Urgencia',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'all', child: Text('Todas')),
+                DropdownMenuItem(value: 'low', child: Text('Baja')),
+                DropdownMenuItem(value: 'medium', child: Text('Media')),
+                DropdownMenuItem(value: 'high', child: Text('Alta')),
+              ],
+              onChanged: (value) => setState(() => _urgencyFilter = value ?? 'all'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildLegend(BuildContext context) {
     return Wrap(
       spacing: 8,
@@ -211,6 +308,8 @@ class _MapScreenState extends State<MapScreen> {
             ),
             const SizedBox(height: 16),
             _buildLegend(context),
+            const SizedBox(height: 12),
+            _buildFilters(),
             const SizedBox(height: 20),
             if (!widget.isBackendConfigured)
               const Card(
@@ -243,13 +342,13 @@ class _MapScreenState extends State<MapScreen> {
                     );
                   }
 
-                  final reports = snapshot.data ?? [];
+                  final reports = _applyFilters(snapshot.data ?? []);
                   if (reports.isEmpty) {
                     return const Card(
                       child: ListTile(
                         leading: Icon(Icons.pets),
-                        title: Text('Sin reportes todavía'),
-                        subtitle: Text('Cuando alguien publique un reporte aparecerá en el mapa.'),
+                        title: Text('Sin reportes para estos filtros'),
+                        subtitle: Text('Probá limpiar los filtros o publicar un nuevo reporte.'),
                       ),
                     );
                   }
@@ -260,7 +359,7 @@ class _MapScreenState extends State<MapScreen> {
                       _buildMap(reports),
                       const SizedBox(height: 20),
                       Text(
-                        'Reportes cargados: ${reports.length}',
+                        'Reportes filtrados: ${reports.length}',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 12),
