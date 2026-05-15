@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../services/auth_service.dart';
+
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key});
+  const AuthScreen({
+    super.key,
+    required this.isBackendConfigured,
+  });
 
   static const routeName = '/auth';
+
+  final bool isBackendConfigured;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -32,23 +39,57 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
+    if (!widget.isBackendConfigured) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Falta configurar el backend antes de iniciar sesión.'),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
-    await Future<void>.delayed(const Duration(milliseconds: 400));
+    try {
+      final authService = AuthService();
 
-    if (!mounted) return;
+      if (_isLogin) {
+        await authService.signIn(
+          email: _emailController.text,
+          password: _passwordController.text,
+        );
+      } else {
+        await authService.signUp(
+          email: _emailController.text,
+          password: _passwordController.text,
+          fullName: _fullNameController.text,
+        );
+      }
 
-    setState(() => _isLoading = false);
+      if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _isLogin
-              ? 'Login validado. Próximo paso: conectar Supabase Auth.'
-              : 'Registro validado. Próximo paso: crear usuario en Supabase.',
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _isLogin
+                ? 'Sesión iniciada correctamente.'
+                : 'Cuenta creada. Revisá tu email si la confirmación está activa.',
+          ),
         ),
-      ),
-    );
+      );
+
+      Navigator.pop(context);
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo completar la operación: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -61,6 +102,21 @@ class _AuthScreenState extends State<AuthScreen> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            if (!widget.isBackendConfigured) ...[
+              Card(
+                color: Theme.of(context).colorScheme.errorContainer,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'Backend no configurado. La pantalla está lista, pero falta ejecutar la app con los datos del proyecto.',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+            ],
             Text(
               _isLogin ? 'Bienvenido a Discovery-pET' : 'Sumate a Discovery-pET',
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
