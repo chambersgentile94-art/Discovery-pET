@@ -13,11 +13,25 @@ class SupabaseService {
 
   static const String reportImagesBucket = 'report-images';
 
+  String get _reportSelect => '*, report_images(image_url, storage_path)';
+
   Future<List<AnimalReport>> fetchPublicReports() async {
     final response = await _client
         .from('animal_reports')
-        .select('*, report_images(image_url, storage_path)')
+        .select(_reportSelect)
         .eq('is_public', true)
+        .order('created_at', ascending: false);
+
+    return response
+        .map<AnimalReport>((item) => AnimalReport.fromMap(item))
+        .toList();
+  }
+
+  Future<List<AnimalReport>> fetchReportsByUser(String userId) async {
+    final response = await _client
+        .from('animal_reports')
+        .select(_reportSelect)
+        .eq('created_by', userId)
         .order('created_at', ascending: false);
 
     return response
@@ -48,6 +62,18 @@ class SupabaseService {
         .eq('id', reportId);
   }
 
+  Future<void> closeOwnReport({
+    required String reportId,
+  }) async {
+    await _client
+        .from('animal_reports')
+        .update({
+          'status': 'closed_unresolved',
+          'closed_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', reportId);
+  }
+
   Future<List<ReportUpdate>> fetchReportUpdates(String reportId) async {
     final response = await _client
         .from('report_updates')
@@ -73,6 +99,18 @@ class SupabaseService {
       'comment': comment,
       'old_status': oldStatus,
       'new_status': newStatus,
+    });
+  }
+
+  Future<void> flagReport({
+    required String reportId,
+    required String userId,
+    required String reason,
+  }) async {
+    await _client.from('report_flags').insert({
+      'report_id': reportId,
+      'user_id': userId,
+      'reason': reason,
     });
   }
 
