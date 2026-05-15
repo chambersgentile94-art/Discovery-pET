@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/animal_report.dart';
+import '../models/report_flag.dart';
 import '../models/report_update.dart';
 
 class SupabaseService {
@@ -74,6 +75,19 @@ class SupabaseService {
         .eq('id', reportId);
   }
 
+  Future<void> hideReport({
+    required String reportId,
+  }) async {
+    await _client
+        .from('animal_reports')
+        .update({
+          'is_public': false,
+          'status': 'invalid',
+          'closed_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', reportId);
+  }
+
   Future<List<ReportUpdate>> fetchReportUpdates(String reportId) async {
     final response = await _client
         .from('report_updates')
@@ -112,6 +126,28 @@ class SupabaseService {
       'user_id': userId,
       'reason': reason,
     });
+  }
+
+  Future<List<ReportFlag>> fetchPendingFlags() async {
+    final response = await _client
+        .from('report_flags')
+        .select('*, animal_reports(title, category, urgency)')
+        .eq('status', 'pending')
+        .order('created_at', ascending: false);
+
+    return response
+        .map<ReportFlag>((item) => ReportFlag.fromMap(item))
+        .toList();
+  }
+
+  Future<void> updateFlagStatus({
+    required String flagId,
+    required String status,
+  }) async {
+    await _client
+        .from('report_flags')
+        .update({'status': status})
+        .eq('id', flagId);
   }
 
   Future<String> uploadReportImage({
