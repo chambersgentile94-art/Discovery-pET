@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'auth_screen.dart';
+
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -28,7 +30,16 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Center(
-            child: Text('Próximo paso: login con Supabase Auth.'),
+            child: Text('La cuenta todavía no está vinculada al backend.'),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => Navigator.pushNamed(context, AuthScreen.routeName),
+              icon: const Icon(Icons.login),
+              label: const Text('Acceder'),
+            ),
           ),
           const SizedBox(height: 24),
           const Card(
