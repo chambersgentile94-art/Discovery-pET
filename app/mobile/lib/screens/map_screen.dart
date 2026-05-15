@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../models/animal_report.dart';
 import '../services/supabase_service.dart';
@@ -37,6 +39,111 @@ class _MapScreenState extends State<MapScreen> {
     await _reportsFuture;
   }
 
+  LatLng _initialCenter(List<AnimalReport> reports) {
+    if (reports.isNotEmpty) {
+      return LatLng(reports.first.latitude, reports.first.longitude);
+    }
+
+    return const LatLng(-40.8135, -62.9967);
+  }
+
+  Color _markerColor(AnimalReport report) {
+    if (report.urgency == 'high') return Colors.red;
+    if (report.category == 'adoption') return Colors.pink;
+    if (report.category == 'lost') return Colors.orange;
+    return Colors.deepPurple;
+  }
+
+  void _showReportDetail(AnimalReport report) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: SingleChildScrollView(
+              child: ReportCard(report: report),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMap(List<AnimalReport> reports) {
+    final center = _initialCenter(reports);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: SizedBox(
+        height: 380,
+        child: FlutterMap(
+          options: MapOptions(
+            initialCenter: center,
+            initialZoom: 13,
+            minZoom: 3,
+            maxZoom: 19,
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.discoverypet.mobile',
+            ),
+            MarkerLayer(
+              markers: reports.map((report) {
+                return Marker(
+                  point: LatLng(report.latitude, report.longitude),
+                  width: 46,
+                  height: 46,
+                  child: GestureDetector(
+                    onTap: () => _showReportDetail(report),
+                    child: Icon(
+                      Icons.location_on,
+                      color: _markerColor(report),
+                      size: 42,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const RichAttributionWidget(
+              attributions: [
+                TextSourceAttribution('OpenStreetMap contributors'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegend(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: const [
+        Chip(
+          avatar: Icon(Icons.location_on, color: Colors.red),
+          label: Text('Urgente'),
+        ),
+        Chip(
+          avatar: Icon(Icons.location_on, color: Colors.orange),
+          label: Text('Perdido'),
+        ),
+        Chip(
+          avatar: Icon(Icons.location_on, color: Colors.pink),
+          label: Text('Adopción'),
+        ),
+        Chip(
+          avatar: Icon(Icons.location_on, color: Colors.deepPurple),
+          label: Text('Otros'),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -65,28 +172,18 @@ class _MapScreenState extends State<MapScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '🗺️ Reportes cercanos',
+                    '🗺️ Mapa de reportes',
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                   SizedBox(height: 12),
                   Text(
-                    'Primera versión de lectura real desde Supabase. Luego se reemplazará por Google Maps con marcadores.',
+                    'Tocá un marcador para ver el detalle del caso. Los reportes se cargan desde Supabase.',
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            const Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Chip(label: Text('Perros')),
-                Chip(label: Text('Gatos')),
-                Chip(label: Text('Perdidos')),
-                Chip(label: Text('Vistos')),
-                Chip(label: Text('Urgentes')),
-              ],
-            ),
+            const SizedBox(height: 16),
+            _buildLegend(context),
             const SizedBox(height: 20),
             if (!widget.isBackendConfigured)
               const Card(
@@ -125,15 +222,23 @@ class _MapScreenState extends State<MapScreen> {
                       child: ListTile(
                         leading: Icon(Icons.pets),
                         title: Text('Sin reportes todavía'),
-                        subtitle: Text('Cuando alguien publique un reporte aparecerá en esta lista.'),
+                        subtitle: Text('Cuando alguien publique un reporte aparecerá en el mapa.'),
                       ),
                     );
                   }
 
                   return Column(
-                    children: reports
-                        .map((report) => ReportCard(report: report))
-                        .toList(),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildMap(reports),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Reportes cargados: ${reports.length}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 12),
+                      ...reports.map((report) => ReportCard(report: report)),
+                    ],
                   );
                 },
               ),
