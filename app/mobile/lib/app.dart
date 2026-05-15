@@ -34,7 +34,7 @@ class DiscoveryPetApp extends StatelessWidget {
         MapScreen.routeName: (_) => const MapScreen(),
         ReportFormScreen.routeName: (_) => const ReportFormScreen(),
         AdoptionScreen.routeName: (_) => const AdoptionScreen(),
-        ProfileScreen.routeName: (_) => const ProfileScreen(),
+        ProfileScreen.routeName: (_) => ProfileScreen(isBackendConfigured: config.hasBackendConfig),
       },
     );
   }
