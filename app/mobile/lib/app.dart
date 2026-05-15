@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'screens/adoption_screen.dart';
+import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/profile_screen.dart';
@@ -23,6 +24,7 @@ class DiscoveryPetApp extends StatelessWidget {
       initialRoute: HomeScreen.routeName,
       routes: {
         HomeScreen.routeName: (_) => const HomeScreen(),
+        AuthScreen.routeName: (_) => const AuthScreen(),
         MapScreen.routeName: (_) => const MapScreen(),
         ReportFormScreen.routeName: (_) => const ReportFormScreen(),
         AdoptionScreen.routeName: (_) => const AdoptionScreen(),
