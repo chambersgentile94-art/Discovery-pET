@@ -1,20 +1,58 @@
 import 'package:flutter/material.dart';
 
-class MapScreen extends StatelessWidget {
-  const MapScreen({super.key});
+import '../models/animal_report.dart';
+import '../services/supabase_service.dart';
+import '../widgets/report_card.dart';
+
+class MapScreen extends StatefulWidget {
+  const MapScreen({
+    super.key,
+    required this.isBackendConfigured,
+  });
 
   static const routeName = '/map';
+
+  final bool isBackendConfigured;
+
+  @override
+  State<MapScreen> createState() => _MapScreenState();
+}
+
+class _MapScreenState extends State<MapScreen> {
+  late Future<List<AnimalReport>> _reportsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _reportsFuture = _loadReports();
+  }
+
+  Future<List<AnimalReport>> _loadReports() async {
+    if (!widget.isBackendConfigured) return [];
+    return SupabaseService().fetchPublicReports();
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _reportsFuture = _loadReports());
+    await _reportsFuture;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mapa de reportes'),
+        actions: [
+          IconButton(
+            onPressed: _refresh,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: ListView(
+          padding: const EdgeInsets.all(20),
           children: [
             Container(
               width: double.infinity,
@@ -27,22 +65,17 @@ class MapScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '🗺️ Mapa en preparación',
+                    '🗺️ Reportes cercanos',
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                   SizedBox(height: 12),
                   Text(
-                    'Esta pantalla será conectada a Google Maps y luego mostrará reportes reales desde Supabase.',
+                    'Primera versión de lectura real desde Supabase. Luego se reemplazará por Google Maps con marcadores.',
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'Filtros previstos',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
             const Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -54,6 +87,56 @@ class MapScreen extends StatelessWidget {
                 Chip(label: Text('Urgentes')),
               ],
             ),
+            const SizedBox(height: 20),
+            if (!widget.isBackendConfigured)
+              const Card(
+                child: ListTile(
+                  leading: Icon(Icons.warning),
+                  title: Text('Backend no configurado'),
+                  subtitle: Text('Ejecutá la app con los parámetros del proyecto para leer reportes.'),
+                ),
+              )
+            else
+              FutureBuilder<List<AnimalReport>>(
+                future: _reportsFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(30),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+
+                  if (snapshot.hasError) {
+                    return Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.error),
+                        title: const Text('No se pudieron cargar los reportes'),
+                        subtitle: Text('${snapshot.error}'),
+                      ),
+                    );
+                  }
+
+                  final reports = snapshot.data ?? [];
+                  if (reports.isEmpty) {
+                    return const Card(
+                      child: ListTile(
+                        leading: Icon(Icons.pets),
+                        title: Text('Sin reportes todavía'),
+                        subtitle: Text('Cuando alguien publique un reporte aparecerá en esta lista.'),
+                      ),
+                    );
+                  }
+
+                  return Column(
+                    children: reports
+                        .map((report) => ReportCard(report: report))
+                        .toList(),
+                  );
+                },
+              ),
           ],
         ),
       ),
