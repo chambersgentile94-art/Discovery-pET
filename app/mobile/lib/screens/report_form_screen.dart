@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/animal_report.dart';
@@ -22,6 +23,9 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   final _latitudeController = TextEditingController(text: '-40.8135');
   final _longitudeController = TextEditingController(text: '-62.9967');
 
+  final _imagePicker = ImagePicker();
+
+  XFile? _selectedImage;
   String _animalType = 'dog';
   String _category = 'lost';
   String _urgency = 'medium';
@@ -36,6 +40,49 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     _latitudeController.dispose();
     _longitudeController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final image = await _imagePicker.pickImage(
+      source: source,
+      imageQuality: 78,
+      maxWidth: 1600,
+    );
+
+    if (image == null) return;
+
+    setState(() => _selectedImage = image);
+  }
+
+  Future<void> _showImageSourceSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Elegir desde galería'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera),
+                title: const Text('Tomar foto'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _useCurrentLocation() async {
@@ -108,6 +155,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     setState(() => _isSaving = true);
 
     try {
+      final service = SupabaseService();
       final report = AnimalReport(
         animalType: _animalType,
         category: _category,
@@ -122,10 +170,21 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
             : _addressController.text.trim(),
       );
 
-      await SupabaseService().createReport(
+      final reportId = await service.createReport(
         createdBy: currentUser.id,
         report: report,
       );
+
+      if (_selectedImage != null) {
+        final bytes = await _selectedImage!.readAsBytes();
+        final extension = _selectedImage!.name.split('.').last;
+
+        await service.uploadReportImage(
+          reportId: reportId,
+          bytes: bytes,
+          fileExtension: extension,
+        );
+      }
 
       if (!mounted) return;
 
@@ -146,6 +205,8 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final imageName = _selectedImage?.name;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Reportar animal'),
@@ -285,13 +346,9 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
             ),
             const SizedBox(height: 20),
             OutlinedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Próximo paso: adjuntar foto.')),
-                );
-              },
+              onPressed: _showImageSourceSheet,
               icon: const Icon(Icons.photo_camera),
-              label: const Text('Agregar foto'),
+              label: Text(imageName == null ? 'Agregar foto' : 'Foto: $imageName'),
             ),
             const SizedBox(height: 10),
             OutlinedButton.icon(
