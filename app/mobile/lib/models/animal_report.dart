@@ -1,6 +1,7 @@
 class AnimalReport {
   const AnimalReport({
     this.id,
+    this.createdBy,
     required this.animalType,
     required this.category,
     required this.title,
@@ -14,6 +15,7 @@ class AnimalReport {
   });
 
   final String? id;
+  final String? createdBy;
   final String animalType;
   final String category;
   final String title;
@@ -37,6 +39,7 @@ class AnimalReport {
 
     return AnimalReport(
       id: map['id'] as String?,
+      createdBy: map['created_by'] as String?,
       animalType: map['animal_type'] as String,
       category: map['category'] as String,
       title: map['title'] as String,
@@ -63,5 +66,24 @@ class AnimalReport {
       'longitude': longitude,
       'approximate_address': approximateAddress,
     };
+  }
+
+  AnimalReport copyWith({
+    String? status,
+  }) {
+    return AnimalReport(
+      id: id,
+      createdBy: createdBy,
+      animalType: animalType,
+      category: category,
+      title: title,
+      description: description,
+      status: status ?? this.status,
+      urgency: urgency,
+      latitude: latitude,
+      longitude: longitude,
+      approximateAddress: approximateAddress,
+      mainImageUrl: mainImageUrl,
+    );
   }
 }
