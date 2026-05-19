@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/animal_report.dart';
 import '../models/report_flag.dart';
 import '../models/report_update.dart';
+import '../models/user_profile.dart';
 
 class SupabaseService {
   SupabaseService({SupabaseClient? client})
@@ -15,6 +16,20 @@ class SupabaseService {
   static const String reportImagesBucket = 'report-images';
 
   String get _reportSelect => '*, report_images(image_url, storage_path)';
+
+  Future<UserProfile?> fetchCurrentProfile() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return null;
+
+    final response = await _client
+        .from('profiles')
+        .select()
+        .eq('id', user.id)
+        .maybeSingle();
+
+    if (response == null) return null;
+    return UserProfile.fromMap(response);
+  }
 
   Future<List<AnimalReport>> fetchPublicReports() async {
     final response = await _client
