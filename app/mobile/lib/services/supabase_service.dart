@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/adoption_request.dart';
 import '../models/animal_report.dart';
 import '../models/report_flag.dart';
 import '../models/report_update.dart';
@@ -163,6 +164,40 @@ class SupabaseService {
         .from('report_flags')
         .update({'status': status})
         .eq('id', flagId);
+  }
+
+  Future<void> createAdoptionRequest({
+    required String reportId,
+    required String requesterId,
+    required String message,
+  }) async {
+    await _client.from('adoption_requests').insert({
+      'report_id': reportId,
+      'requester_id': requesterId,
+      'message': message,
+    });
+  }
+
+  Future<List<AdoptionRequest>> fetchAdoptionRequestsForMyReports(String ownerId) async {
+    final response = await _client
+        .from('adoption_requests')
+        .select('*, animal_reports!inner(title, created_by), profiles(full_name, email)')
+        .eq('animal_reports.created_by', ownerId)
+        .order('created_at', ascending: false);
+
+    return response
+        .map<AdoptionRequest>((item) => AdoptionRequest.fromMap(item))
+        .toList();
+  }
+
+  Future<void> updateAdoptionRequestStatus({
+    required String requestId,
+    required String status,
+  }) async {
+    await _client
+        .from('adoption_requests')
+        .update({'status': status})
+        .eq('id', requestId);
   }
 
   Future<String> uploadReportImage({
