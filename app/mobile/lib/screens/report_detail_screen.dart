@@ -18,6 +18,7 @@ class ReportDetailScreen extends StatefulWidget {
 class _ReportDetailScreenState extends State<ReportDetailScreen> {
   final _commentController = TextEditingController();
   final _flagReasonController = TextEditingController();
+  final _adoptionMessageController = TextEditingController();
   final _service = SupabaseService();
 
   AnimalReport? _report;
@@ -25,6 +26,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   String? _selectedStatus;
   bool _isSaving = false;
   bool _isFlagging = false;
+  bool _isRequestingAdoption = false;
 
   static const _statuses = [
     'reported',
@@ -57,6 +59,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   void dispose() {
     _commentController.dispose();
     _flagReasonController.dispose();
+    _adoptionMessageController.dispose();
     super.dispose();
   }
 
@@ -154,6 +157,83 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     }
   }
 
+  Future<void> _showAdoptionDialog() async {
+    _adoptionMessageController.clear();
+
+    final message = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Solicitar adopción'),
+          content: TextField(
+            controller: _adoptionMessageController,
+            minLines: 3,
+            maxLines: 6,
+            decoration: const InputDecoration(
+              labelText: 'Mensaje',
+              hintText: 'Contá por qué querés adoptar y cómo podrían contactarte.',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                final value = _adoptionMessageController.text.trim();
+                if (value.isEmpty) return;
+                Navigator.pop(context, value);
+              },
+              icon: const Icon(Icons.favorite),
+              label: const Text('Enviar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (message == null || message.trim().isEmpty) return;
+    await _createAdoptionRequest(message.trim());
+  }
+
+  Future<void> _createAdoptionRequest(String message) async {
+    final report = _report;
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (report == null || report.id == null) return;
+
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tenés que iniciar sesión para solicitar una adopción.')),
+      );
+      return;
+    }
+
+    setState(() => _isRequestingAdoption = true);
+
+    try {
+      await _service.createAdoptionRequest(
+        reportId: report.id!,
+        requesterId: user.id,
+        message: message,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Solicitud de adopción enviada.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo enviar la solicitud: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _isRequestingAdoption = false);
+    }
+  }
+
   Future<void> _showFlagDialog() async {
     _flagReasonController.clear();
 
@@ -234,6 +314,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final report = _report;
+    final canRequestAdoption = report?.category == 'adoption' || report?.status == 'adoption';
 
     if (report == null || report.id == null) {
       return Scaffold(
@@ -263,6 +344,20 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           padding: const EdgeInsets.all(20),
           children: [
             ReportCard(report: report),
+            if (canRequestAdoption) ...[
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _isRequestingAdoption ? null : _showAdoptionDialog,
+                icon: _isRequestingAdoption
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.favorite),
+                label: const Text('Solicitar adopción'),
+              ),
+            ],
             const SizedBox(height: 12),
             Card(
               child: Padding(
