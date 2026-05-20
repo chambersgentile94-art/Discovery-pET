@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/user_profile.dart';
 import '../services/supabase_service.dart';
 import '../widgets/home_action_card.dart';
+import 'adoption_requests_screen.dart';
 import 'adoption_screen.dart';
 import 'map_screen.dart';
 import 'moderation_screen.dart';
@@ -60,6 +61,12 @@ class _HomeScreenState extends State<HomeScreen> {
         title: 'Adopciones',
         description: 'Ver animales disponibles para adoptar.',
         onTap: () => Navigator.pushNamed(context, AdoptionScreen.routeName),
+      ),
+      HomeActionCard(
+        icon: Icons.mark_email_read,
+        title: 'Solicitudes de adopción',
+        description: 'Revisar interesados en adoptar animales publicados por vos.',
+        onTap: () => Navigator.pushNamed(context, AdoptionRequestsScreen.routeName),
       ),
       HomeActionCard(
         icon: Icons.person,
