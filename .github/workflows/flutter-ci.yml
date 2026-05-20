@@ -1,0 +1,49 @@
+name: Flutter CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/mobile/**'
+      - '.github/workflows/flutter-ci.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'app/mobile/**'
+      - '.github/workflows/flutter-ci.yml'
+
+jobs:
+  validate-mobile:
+    name: Validate Flutter mobile app
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: app/mobile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze project
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build debug APK
+        run: flutter build apk --debug
