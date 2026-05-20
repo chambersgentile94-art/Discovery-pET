@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart';
 
 class PickedLocation {
   const PickedLocation({
@@ -17,19 +18,17 @@ class LocationPickerScreen extends StatefulWidget {
     super.key,
     required this.initialLatitude,
     required this.initialLongitude,
-    required this.isGoogleMapsConfigured,
   });
 
   final double initialLatitude;
   final double initialLongitude;
-  final bool isGoogleMapsConfigured;
 
   @override
   State<LocationPickerScreen> createState() => _LocationPickerScreenState();
 }
 
 class _LocationPickerScreenState extends State<LocationPickerScreen> {
-  GoogleMapController? _mapController;
+  final MapController _mapController = MapController();
   late LatLng _selectedPoint;
   bool _isLocating = false;
 
@@ -37,12 +36,6 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   void initState() {
     super.initState();
     _selectedPoint = LatLng(widget.initialLatitude, widget.initialLongitude);
-  }
-
-  @override
-  void dispose() {
-    _mapController?.dispose();
-    super.dispose();
   }
 
   Future<void> _useCurrentLocation() async {
@@ -72,12 +65,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
       final newPoint = LatLng(position.latitude, position.longitude);
       setState(() => _selectedPoint = newPoint);
-
-      await _mapController?.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(target: newPoint, zoom: 16),
-        ),
-      );
+      _mapController.move(newPoint, 16);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -98,61 +86,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     );
   }
 
-  Widget _buildMissingConfig() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.map_outlined, size: 48),
-                const SizedBox(height: 12),
-                const Text(
-                  'Google Maps no está configurado',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Para seleccionar coordenadas desde el mapa tenés que configurar la API key de Google Maps. Mientras tanto podés usar el botón de ubicación actual o cargar coordenadas manualmente.',
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: _isLocating ? null : _useCurrentLocation,
-                  icon: _isLocating
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.my_location),
-                  label: const Text('Usar ubicación actual'),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: _confirmLocation,
-                  child: const Text('Confirmar coordenadas actuales'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final marker = Marker(
-      markerId: const MarkerId('selected-location'),
-      position: _selectedPoint,
-      infoWindow: const InfoWindow(title: 'Ubicación seleccionada'),
-    );
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Seleccionar ubicación'),
@@ -164,36 +99,58 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           ),
         ],
       ),
-      body: widget.isGoogleMapsConfigured
-          ? Stack(
-              children: [
-                GoogleMap(
-                  initialCameraPosition: CameraPosition(
-                    target: _selectedPoint,
-                    zoom: 14,
-                  ),
-                  myLocationButtonEnabled: false,
-                  myLocationEnabled: true,
-                  markers: {marker},
-                  onMapCreated: (controller) => _mapController = controller,
-                  onTap: (point) => setState(() => _selectedPoint = point),
-                ),
-                Positioned(
-                  left: 16,
-                  right: 16,
-                  top: 16,
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Text(
-                        'Tocá el mapa para mover el marcador.\n${_selectedPoint.latitude.toStringAsFixed(7)}, ${_selectedPoint.longitude.toStringAsFixed(7)}',
-                      ),
+      body: Stack(
+        children: [
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: _selectedPoint,
+              initialZoom: 14,
+              minZoom: 3,
+              maxZoom: 19,
+              onTap: (_, point) => setState(() => _selectedPoint = point),
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.discoverypet.mobile',
+              ),
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: _selectedPoint,
+                    width: 52,
+                    height: 52,
+                    child: const Icon(
+                      Icons.location_on,
+                      size: 48,
+                      color: Colors.red,
                     ),
                   ),
+                ],
+              ),
+              const RichAttributionWidget(
+                attributions: [
+                  TextSourceAttribution('OpenStreetMap contributors'),
+                ],
+              ),
+            ],
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            top: 16,
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  'Tocá el mapa para mover el marcador.\n${_selectedPoint.latitude.toStringAsFixed(7)}, ${_selectedPoint.longitude.toStringAsFixed(7)}',
                 ),
-              ],
-            )
-          : _buildMissingConfig(),
+              ),
+            ),
+          ),
+        ],
+      ),
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
