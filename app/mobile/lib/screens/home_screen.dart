@@ -5,6 +5,7 @@ import '../services/supabase_service.dart';
 import '../widgets/home_action_card.dart';
 import 'adoption_requests_screen.dart';
 import 'adoption_screen.dart';
+import 'alert_preferences_screen.dart';
 import 'map_screen.dart';
 import 'moderation_screen.dart';
 import 'my_reports_screen.dart';
@@ -49,6 +50,12 @@ class _HomeScreenState extends State<HomeScreen> {
         title: 'Reportar animal',
         description: 'Publicar una mascota perdida, abandonada o vista en la calle.',
         onTap: () => Navigator.pushNamed(context, ReportFormScreen.routeName),
+      ),
+      HomeActionCard(
+        icon: Icons.notifications_active,
+        title: 'Alertas por zona',
+        description: 'Elegir radio, ubicación y categorías para futuras notificaciones.',
+        onTap: () => Navigator.pushNamed(context, AlertPreferencesScreen.routeName),
       ),
       HomeActionCard(
         icon: Icons.assignment_ind,
