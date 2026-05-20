@@ -3,21 +3,15 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../config/app_config.dart';
 import '../models/animal_report.dart';
 import '../models/user_profile.dart';
 import '../services/supabase_service.dart';
 import 'location_picker_screen.dart';
 
 class ReportFormScreen extends StatefulWidget {
-  const ReportFormScreen({
-    super.key,
-    required this.config,
-  });
+  const ReportFormScreen({super.key});
 
   static const routeName = '/report-form';
-
-  final AppConfig config;
 
   @override
   State<ReportFormScreen> createState() => _ReportFormScreenState();
@@ -175,7 +169,6 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
         builder: (_) => LocationPickerScreen(
           initialLatitude: latitude,
           initialLongitude: longitude,
-          isGoogleMapsConfigured: widget.config.hasMapsConfig,
         ),
       ),
     );
