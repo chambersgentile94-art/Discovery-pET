@@ -11,6 +11,8 @@ class AnimalReport {
     required this.latitude,
     required this.longitude,
     this.approximateAddress,
+    this.contactPhone,
+    this.showContactPhone = false,
     this.mainImageUrl,
   });
 
@@ -25,6 +27,8 @@ class AnimalReport {
   final double latitude;
   final double longitude;
   final String? approximateAddress;
+  final String? contactPhone;
+  final bool showContactPhone;
   final String? mainImageUrl;
 
   factory AnimalReport.fromMap(Map<String, dynamic> map) {
@@ -49,6 +53,8 @@ class AnimalReport {
       latitude: (map['latitude'] as num).toDouble(),
       longitude: (map['longitude'] as num).toDouble(),
       approximateAddress: map['approximate_address'] as String?,
+      contactPhone: map['contact_phone'] as String?,
+      showContactPhone: (map['show_contact_phone'] ?? false) as bool,
       mainImageUrl: imageUrl,
     );
   }
@@ -65,6 +71,8 @@ class AnimalReport {
       'latitude': latitude,
       'longitude': longitude,
       'approximate_address': approximateAddress,
+      'contact_phone': contactPhone,
+      'show_contact_phone': showContactPhone,
     };
   }
 
@@ -83,6 +91,8 @@ class AnimalReport {
       latitude: latitude,
       longitude: longitude,
       approximateAddress: approximateAddress,
+      contactPhone: contactPhone,
+      showContactPhone: showContactPhone,
       mainImageUrl: mainImageUrl,
     );
   }
