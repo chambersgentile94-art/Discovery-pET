@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/animal_report.dart';
+import '../models/user_profile.dart';
 import '../services/supabase_service.dart';
 
 class ReportFormScreen extends StatefulWidget {
@@ -22,6 +23,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   final _addressController = TextEditingController();
   final _latitudeController = TextEditingController(text: '-40.8135');
   final _longitudeController = TextEditingController(text: '-62.9967');
+  final _contactPhoneController = TextEditingController();
 
   final _imagePicker = ImagePicker();
 
@@ -29,8 +31,16 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   String _animalType = 'dog';
   String _category = 'lost';
   String _urgency = 'medium';
+  bool _showContactPhone = false;
   bool _isSaving = false;
   bool _isLocating = false;
+  bool _isLoadingProfile = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileContact();
+  }
 
   @override
   void dispose() {
@@ -39,7 +49,21 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     _addressController.dispose();
     _latitudeController.dispose();
     _longitudeController.dispose();
+    _contactPhoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadProfileContact() async {
+    setState(() => _isLoadingProfile = true);
+    try {
+      final UserProfile? profile = await SupabaseService().fetchCurrentProfile();
+      if (!mounted) return;
+      _contactPhoneController.text = profile?.phone ?? '';
+    } catch (_) {
+      // El teléfono es opcional; no bloquea la creación del reporte.
+    } finally {
+      if (mounted) setState(() => _isLoadingProfile = false);
+    }
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -152,6 +176,14 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       return;
     }
 
+    final contactPhone = _contactPhoneController.text.trim();
+    if (_showContactPhone && contactPhone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingresá un teléfono o desactivá mostrar contacto.')),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     try {
@@ -168,6 +200,8 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
         approximateAddress: _addressController.text.trim().isEmpty
             ? null
             : _addressController.text.trim(),
+        contactPhone: contactPhone.isEmpty ? null : contactPhone,
+        showContactPhone: _showContactPhone,
       );
 
       final reportId = await service.createReport(
@@ -343,6 +377,51 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 18),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Contacto opcional',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Podés mostrar un teléfono o WhatsApp para coordinar el caso. Si lo desactivás, no se verá públicamente.',
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _contactPhoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        labelText: 'Teléfono / WhatsApp',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: _isLoadingProfile
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              )
+                            : null,
+                      ),
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: _showContactPhone,
+                      title: const Text('Mostrar teléfono en este reporte'),
+                      subtitle: const Text('Activá solo si querés que otros usuarios puedan contactarte directo.'),
+                      onChanged: (value) => setState(() => _showContactPhone = value),
+                    ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 20),
             OutlinedButton.icon(
