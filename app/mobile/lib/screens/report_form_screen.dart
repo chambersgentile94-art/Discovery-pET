@@ -3,14 +3,21 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/app_config.dart';
 import '../models/animal_report.dart';
 import '../models/user_profile.dart';
 import '../services/supabase_service.dart';
+import 'location_picker_screen.dart';
 
 class ReportFormScreen extends StatefulWidget {
-  const ReportFormScreen({super.key});
+  const ReportFormScreen({
+    super.key,
+    required this.config,
+  });
 
   static const routeName = '/report-form';
+
+  final AppConfig config;
 
   @override
   State<ReportFormScreen> createState() => _ReportFormScreenState();
@@ -59,6 +66,9 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       final UserProfile? profile = await SupabaseService().fetchCurrentProfile();
       if (!mounted) return;
       _contactPhoneController.text = profile?.phone ?? '';
+      if (_addressController.text.trim().isEmpty && profile?.city != null) {
+        _addressController.text = profile!.city!;
+      }
     } catch (_) {
       // El teléfono es opcional; no bloquea la creación del reporte.
     } finally {
@@ -109,30 +119,34 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     );
   }
 
+  Future<Position> _getCurrentPosition() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      throw Exception('El servicio de ubicación está desactivado.');
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      throw Exception('No se otorgó permiso de ubicación.');
+    }
+
+    return Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+      ),
+    );
+  }
+
   Future<void> _useCurrentLocation() async {
     setState(() => _isLocating = true);
 
     try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        throw Exception('El servicio de ubicación está desactivado.');
-      }
-
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        throw Exception('No se otorgó permiso de ubicación.');
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
-      );
+      final position = await _getCurrentPosition();
 
       _latitudeController.text = position.latitude.toStringAsFixed(7);
       _longitudeController.text = position.longitude.toStringAsFixed(7);
@@ -149,6 +163,32 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     } finally {
       if (mounted) setState(() => _isLocating = false);
     }
+  }
+
+  Future<void> _openLocationPicker() async {
+    final latitude = double.tryParse(_latitudeController.text.trim()) ?? -40.8135;
+    final longitude = double.tryParse(_longitudeController.text.trim()) ?? -62.9967;
+
+    final result = await Navigator.push<PickedLocation>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(
+          initialLatitude: latitude,
+          initialLongitude: longitude,
+          isGoogleMapsConfigured: widget.config.hasMapsConfig,
+        ),
+      ),
+    );
+
+    if (result == null) return;
+
+    _latitudeController.text = result.latitude.toStringAsFixed(7);
+    _longitudeController.text = result.longitude.toStringAsFixed(7);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Coordenadas seleccionadas.')),
+    );
   }
 
   Future<void> _submit() async {
@@ -378,6 +418,12 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: _openLocationPicker,
+              icon: const Icon(Icons.map),
+              label: const Text('Seleccionar coordenadas en el mapa'),
+            ),
             const SizedBox(height: 18),
             Card(
               child: Padding(
@@ -439,7 +485,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.my_location),
-              label: const Text('Usar mi ubicación'),
+              label: const Text('Usar mi ubicación actual'),
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
