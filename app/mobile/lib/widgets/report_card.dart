@@ -79,6 +79,8 @@ class ReportCard extends StatelessWidget {
         return 'Reencontrado';
       case 'closed_unresolved':
         return 'Cerrado sin resolver';
+      case 'invalid':
+        return 'Inválido';
       default:
         return report.status;
     }
@@ -97,6 +99,10 @@ class ReportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canShowPhone = report.showContactPhone &&
+        report.contactPhone != null &&
+        report.contactPhone!.trim().isNotEmpty;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
       clipBehavior: Clip.antiAlias,
@@ -158,6 +164,11 @@ class ReportCard extends StatelessWidget {
                           avatar: Icon(Icons.warning, color: Colors.red),
                           label: Text('Urgente'),
                         ),
+                      if (canShowPhone)
+                        const Chip(
+                          avatar: Icon(Icons.phone),
+                          label: Text('Contacto visible'),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -166,6 +177,8 @@ class ReportCard extends StatelessWidget {
                   if (report.approximateAddress != null &&
                       report.approximateAddress!.isNotEmpty)
                     Text('📍 ${report.approximateAddress}'),
+                  if (canShowPhone)
+                    Text('📞 Contacto: ${report.contactPhone}'),
                   Text(
                     'Coordenadas: ${report.latitude.toStringAsFixed(5)}, ${report.longitude.toStringAsFixed(5)}',
                     style: Theme.of(context).textTheme.bodySmall,
