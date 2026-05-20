@@ -32,6 +32,27 @@ class SupabaseService {
     return UserProfile.fromMap(response);
   }
 
+  Future<void> updateCurrentProfile({
+    required String fullName,
+    required String phone,
+    required String city,
+    required String role,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw Exception('Usuario no autenticado.');
+    }
+
+    final normalizedRole = role == 'admin' ? 'user' : role;
+
+    await _client.from('profiles').update({
+      'full_name': fullName.trim(),
+      'phone': phone.trim().isEmpty ? null : phone.trim(),
+      'city': city.trim().isEmpty ? null : city.trim(),
+      'role': normalizedRole,
+    }).eq('id', user.id);
+  }
+
   Future<List<AnimalReport>> fetchPublicReports() async {
     final response = await _client
         .from('animal_reports')
