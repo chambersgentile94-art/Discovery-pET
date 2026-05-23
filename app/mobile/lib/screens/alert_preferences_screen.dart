@@ -1,11 +1,16 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/alert_preference.dart';
+import '../models/animal_report.dart';
 import '../services/supabase_service.dart';
+import '../widgets/report_card.dart';
 import 'auth_screen.dart';
 import 'location_picker_screen.dart';
+import 'report_detail_screen.dart';
 
 class AlertPreferencesScreen extends StatefulWidget {
   const AlertPreferencesScreen({
@@ -29,9 +34,11 @@ class _AlertPreferencesScreenState extends State<AlertPreferencesScreen> {
   final _radiusController = TextEditingController(text: '5');
 
   AlertPreference? _currentPreference;
+  List<_ReportDistance> _matchingReports = [];
   bool _isLoading = false;
   bool _isSaving = false;
   bool _isLocating = false;
+  bool _isLoadingMatches = false;
   bool _isEnabled = true;
   bool _notifyLost = true;
   bool _notifySeen = true;
@@ -81,6 +88,8 @@ class _AlertPreferencesScreenState extends State<AlertPreferencesScreen> {
         _notifyInjured = preference.notifyInjured;
         _notifyAdoption = preference.notifyAdoption;
       }
+
+      await _refreshMatches(showErrors: false);
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -119,6 +128,7 @@ class _AlertPreferencesScreenState extends State<AlertPreferencesScreen> {
       final position = await _getCurrentPosition();
       _latitudeController.text = position.latitude.toStringAsFixed(7);
       _longitudeController.text = position.longitude.toStringAsFixed(7);
+      await _refreshMatches(showErrors: false);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -152,6 +162,7 @@ class _AlertPreferencesScreenState extends State<AlertPreferencesScreen> {
 
     _latitudeController.text = result.latitude.toStringAsFixed(7);
     _longitudeController.text = result.longitude.toStringAsFixed(7);
+    await _refreshMatches(showErrors: false);
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -224,6 +235,95 @@ class _AlertPreferencesScreenState extends State<AlertPreferencesScreen> {
     }
   }
 
+  Future<void> _refreshMatches({bool showErrors = true}) async {
+    if (!widget.isBackendConfigured) return;
+
+    final latitude = double.tryParse(_latitudeController.text.trim());
+    final longitude = double.tryParse(_longitudeController.text.trim());
+    final radius = double.tryParse(_radiusController.text.trim());
+
+    if (latitude == null || longitude == null || radius == null || radius <= 0) {
+      return;
+    }
+
+    setState(() => _isLoadingMatches = true);
+
+    try {
+      final reports = await SupabaseService().fetchPublicReports();
+      final matches = reports
+          .where(_matchesSelectedCategories)
+          .map((report) {
+            final distance = _distanceKm(
+              latitude,
+              longitude,
+              report.latitude,
+              report.longitude,
+            );
+            return _ReportDistance(report: report, distanceKm: distance);
+          })
+          .where((item) => item.distanceKm <= radius)
+          .toList()
+        ..sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
+
+      if (!mounted) return;
+      setState(() => _matchingReports = matches);
+    } catch (error) {
+      if (!mounted || !showErrors) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudieron calcular coincidencias: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoadingMatches = false);
+    }
+  }
+
+  bool _matchesSelectedCategories(AnimalReport report) {
+    switch (report.category) {
+      case 'lost':
+        return _notifyLost;
+      case 'seen':
+        return _notifySeen;
+      case 'abandoned':
+        return _notifyAbandoned;
+      case 'injured':
+        return _notifyInjured;
+      case 'adoption':
+        return _notifyAdoption;
+      default:
+        return false;
+    }
+  }
+
+  double _distanceKm(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
+    const earthRadiusKm = 6371.0;
+    final dLat = _degreesToRadians(lat2 - lat1);
+    final dLon = _degreesToRadians(lon2 - lon1);
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(_degreesToRadians(lat1)) *
+            cos(_degreesToRadians(lat2)) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadiusKm * c;
+  }
+
+  double _degreesToRadians(double degrees) => degrees * pi / 180;
+
+  Future<void> _openReportDetail(AnimalReport report) async {
+    await Navigator.pushNamed(
+      context,
+      ReportDetailScreen.routeName,
+      arguments: report,
+    );
+    if (!mounted) return;
+    await _refreshMatches(showErrors: false);
+  }
+
   Widget _buildLoggedOutState() {
     return Card(
       child: Padding(
@@ -262,28 +362,111 @@ class _AlertPreferencesScreenState extends State<AlertPreferencesScreen> {
             SwitchListTile(
               value: _notifyLost,
               title: const Text('Mascotas perdidas'),
-              onChanged: (value) => setState(() => _notifyLost = value),
+              onChanged: (value) {
+                setState(() => _notifyLost = value);
+                _refreshMatches(showErrors: false);
+              },
             ),
             SwitchListTile(
               value: _notifySeen,
               title: const Text('Animales vistos'),
-              onChanged: (value) => setState(() => _notifySeen = value),
+              onChanged: (value) {
+                setState(() => _notifySeen = value);
+                _refreshMatches(showErrors: false);
+              },
             ),
             SwitchListTile(
               value: _notifyAbandoned,
               title: const Text('Animales abandonados'),
-              onChanged: (value) => setState(() => _notifyAbandoned = value),
+              onChanged: (value) {
+                setState(() => _notifyAbandoned = value);
+                _refreshMatches(showErrors: false);
+              },
             ),
             SwitchListTile(
               value: _notifyInjured,
               title: const Text('Animales heridos'),
-              onChanged: (value) => setState(() => _notifyInjured = value),
+              onChanged: (value) {
+                setState(() => _notifyInjured = value);
+                _refreshMatches(showErrors: false);
+              },
             ),
             SwitchListTile(
               value: _notifyAdoption,
               title: const Text('Adopciones'),
-              onChanged: (value) => setState(() => _notifyAdoption = value),
+              onChanged: (value) {
+                setState(() => _notifyAdoption = value);
+                _refreshMatches(showErrors: false);
+              },
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMatchesPreview() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Reportes dentro de tu zona',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  onPressed: _isLoadingMatches ? null : _refreshMatches,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (_isLoadingMatches)
+              const LinearProgressIndicator()
+            else if (!_isEnabled)
+              const ListTile(
+                leading: Icon(Icons.notifications_off),
+                title: Text('Alertas pausadas'),
+                subtitle: Text('Activá las alertas para usar esta zona.'),
+              )
+            else if (_matchingReports.isEmpty)
+              const ListTile(
+                leading: Icon(Icons.check_circle_outline),
+                title: Text('Sin coincidencias actuales'),
+                subtitle: Text('No hay reportes activos dentro del radio configurado.'),
+              )
+            else ...[
+              Text(
+                '${_matchingReports.length} reporte(s) coinciden con tu configuración actual.',
+              ),
+              const SizedBox(height: 12),
+              ..._matchingReports.take(5).map(
+                    (item) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'A ${item.distanceKm.toStringAsFixed(1)} km',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        ReportCard(
+                          report: item.report,
+                          onTap: () => _openReportDetail(item.report),
+                        ),
+                      ],
+                    ),
+                  ),
+              if (_matchingReports.length > 5)
+                Text(
+                  'Mostrando 5 de ${_matchingReports.length} coincidencias.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+            ],
           ],
         ),
       ),
@@ -339,7 +522,10 @@ class _AlertPreferencesScreenState extends State<AlertPreferencesScreen> {
                     value: _isEnabled,
                     title: const Text('Alertas activas'),
                     subtitle: const Text('Podés pausar las alertas sin borrar la configuración.'),
-                    onChanged: (value) => setState(() => _isEnabled = value),
+                    onChanged: (value) {
+                      setState(() => _isEnabled = value);
+                      _refreshMatches(showErrors: false);
+                    },
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -396,6 +582,7 @@ class _AlertPreferencesScreenState extends State<AlertPreferencesScreen> {
                       labelText: 'Radio de alerta en km',
                       border: OutlineInputBorder(),
                     ),
+                    onChanged: (_) => _refreshMatches(showErrors: false),
                     validator: (value) {
                       final radius = double.tryParse(value?.trim() ?? '');
                       if (radius == null || radius <= 0 || radius > 100) {
@@ -432,6 +619,8 @@ class _AlertPreferencesScreenState extends State<AlertPreferencesScreen> {
                   ),
                   const SizedBox(height: 12),
                   _buildCategorySwitches(),
+                  const SizedBox(height: 12),
+                  _buildMatchesPreview(),
                   const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
@@ -455,4 +644,14 @@ class _AlertPreferencesScreenState extends State<AlertPreferencesScreen> {
       ),
     );
   }
+}
+
+class _ReportDistance {
+  const _ReportDistance({
+    required this.report,
+    required this.distanceKm,
+  });
+
+  final AnimalReport report;
+  final double distanceKm;
 }
