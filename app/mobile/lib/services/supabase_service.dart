@@ -259,6 +259,20 @@ class SupabaseService {
         .toList();
   }
 
+  Future<int> fetchCurrentUserPendingAlertCount() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return 0;
+
+    final response = await _client
+        .from('alert_events')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('status', 'pending')
+        .count(CountOption.exact);
+
+    return response.count;
+  }
+
   Future<int> recalculateCurrentUserAlertEvents() async {
     final response = await _client.rpc('recalculate_my_alert_events');
     if (response is int) return response;
@@ -275,6 +289,20 @@ class SupabaseService {
       if (status == 'seen' || status == 'dismissed')
         'read_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', eventId);
+  }
+
+  Future<void> markAllCurrentUserAlertEventsAsSeen() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+
+    await _client
+        .from('alert_events')
+        .update({
+          'status': 'seen',
+          'read_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('user_id', user.id)
+        .eq('status', 'pending');
   }
 
   Future<String> uploadReportImage({
