@@ -23,6 +23,7 @@ class AlertEventsScreen extends StatefulWidget {
 
 class _AlertEventsScreenState extends State<AlertEventsScreen> {
   late Future<List<AlertEvent>> _eventsFuture;
+  bool _isRecalculating = false;
 
   @override
   void initState() {
@@ -40,6 +41,27 @@ class _AlertEventsScreenState extends State<AlertEventsScreen> {
   Future<void> _refresh() async {
     setState(() => _eventsFuture = _loadEvents());
     await _eventsFuture;
+  }
+
+  Future<void> _recalculate() async {
+    setState(() => _isRecalculating = true);
+
+    try {
+      final created = await SupabaseService().recalculateCurrentUserAlertEvents();
+      await _refresh();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Alertas recalculadas. Nuevas: $created')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudieron recalcular alertas: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _isRecalculating = false);
+    }
   }
 
   Future<void> _goToAuth() async {
@@ -209,7 +231,23 @@ class _AlertEventsScreenState extends State<AlertEventsScreen> {
               )
             else if (user == null)
               _buildLoggedOutState()
-            else
+            else ...[
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.sync),
+                  title: const Text('Recalcular alertas'),
+                  subtitle: const Text('Genera alertas sobre reportes existentes que coincidan con tu zona.'),
+                  trailing: _isRecalculating
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.chevron_right),
+                  onTap: _isRecalculating ? null : _recalculate,
+                ),
+              ),
+              const SizedBox(height: 12),
               FutureBuilder<List<AlertEvent>>(
                 future: _eventsFuture,
                 builder: (context, snapshot) {
@@ -261,6 +299,7 @@ class _AlertEventsScreenState extends State<AlertEventsScreen> {
                   );
                 },
               ),
+            ],
           ],
         ),
       ),
