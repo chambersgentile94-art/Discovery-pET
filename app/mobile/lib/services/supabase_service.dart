@@ -259,6 +259,13 @@ class SupabaseService {
         .toList();
   }
 
+  Future<int> recalculateCurrentUserAlertEvents() async {
+    final response = await _client.rpc('recalculate_my_alert_events');
+    if (response is int) return response;
+    if (response is num) return response.toInt();
+    return 0;
+  }
+
   Future<void> updateAlertEventStatus({
     required String eventId,
     required String status,
