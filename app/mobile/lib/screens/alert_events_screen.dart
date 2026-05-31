@@ -39,12 +39,17 @@ class _AlertEventsScreenState extends State<AlertEventsScreen> {
   }
 
   Future<void> _refresh() async {
-    setState(() => _eventsFuture = _loadEvents());
-    await _eventsFuture;
+    final nextEventsFuture = _loadEvents();
+    setState(() {
+      _eventsFuture = nextEventsFuture;
+    });
+    await nextEventsFuture;
   }
 
   Future<void> _recalculate() async {
-    setState(() => _isRecalculating = true);
+    setState(() {
+      _isRecalculating = true;
+    });
 
     try {
       final created = await SupabaseService().recalculateCurrentUserAlertEvents();
@@ -60,7 +65,11 @@ class _AlertEventsScreenState extends State<AlertEventsScreen> {
         SnackBar(content: Text('No se pudieron recalcular alertas: $error')),
       );
     } finally {
-      if (mounted) setState(() => _isRecalculating = false);
+      if (mounted) {
+        setState(() {
+          _isRecalculating = false;
+        });
+      }
     }
   }
 
