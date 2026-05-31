@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/user_profile.dart';
 import '../services/supabase_service.dart';
@@ -24,21 +25,37 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late Future<UserProfile?> _profileFuture;
+  late Future<int> _pendingAlertsFuture;
 
   @override
   void initState() {
     super.initState();
     _profileFuture = SupabaseService().fetchCurrentProfile();
+    _pendingAlertsFuture = SupabaseService().fetchCurrentUserPendingAlertCount();
   }
 
-  Future<void> _refreshProfile() async {
+  Future<void> _refreshHome() async {
+    final nextProfileFuture = SupabaseService().fetchCurrentProfile();
+    final nextPendingAlertsFuture = SupabaseService().fetchCurrentUserPendingAlertCount();
+
     setState(() {
-      _profileFuture = SupabaseService().fetchCurrentProfile();
+      _profileFuture = nextProfileFuture;
+      _pendingAlertsFuture = nextPendingAlertsFuture;
     });
-    await _profileFuture;
+
+    await Future.wait([
+      nextProfileFuture,
+      nextPendingAlertsFuture,
+    ]);
   }
 
-  List<HomeActionCard> _buildCards(UserProfile? profile) {
+  Future<void> _refreshProfile() => _refreshHome();
+
+  List<HomeActionCard> _buildCards(UserProfile? profile, int pendingAlerts) {
+    final alertDescription = pendingAlerts > 0
+        ? '$pendingAlerts alerta(s) pendiente(s). Revisá reportes nuevos en tu zona.'
+        : 'Sin alertas pendientes. Ver reportes nuevos que coinciden con tu zona.';
+
     final cards = [
       HomeActionCard(
         icon: Icons.location_on,
@@ -53,16 +70,24 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: () => Navigator.pushNamed(context, ReportFormScreen.routeName),
       ),
       HomeActionCard(
-        icon: Icons.notifications_active,
-        title: 'Mis alertas',
-        description: 'Ver reportes nuevos que coinciden con tu zona configurada.',
-        onTap: () => Navigator.pushNamed(context, AlertEventsScreen.routeName),
+        icon: pendingAlerts > 0 ? Icons.notifications_active : Icons.notifications_none,
+        title: pendingAlerts > 0 ? 'Mis alertas · $pendingAlerts' : 'Mis alertas',
+        description: alertDescription,
+        onTap: () async {
+          await Navigator.pushNamed(context, AlertEventsScreen.routeName);
+          if (!mounted) return;
+          await _refreshHome();
+        },
       ),
       HomeActionCard(
         icon: Icons.settings_applications,
         title: 'Configurar alertas',
         description: 'Elegir radio, ubicación y categorías para futuras notificaciones.',
-        onTap: () => Navigator.pushNamed(context, AlertPreferencesScreen.routeName),
+        onTap: () async {
+          await Navigator.pushNamed(context, AlertPreferencesScreen.routeName);
+          if (!mounted) return;
+          await _refreshHome();
+        },
       ),
       HomeActionCard(
         icon: Icons.assignment_ind,
@@ -89,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: () async {
           await Navigator.pushNamed(context, ProfileScreen.routeName);
           if (!mounted) return;
-          await _refreshProfile();
+          await _refreshHome();
         },
       ),
     ];
@@ -109,6 +134,32 @@ class _HomeScreenState extends State<HomeScreen> {
     return cards;
   }
 
+  Widget _buildAlertSummaryCard(int pendingAlerts) {
+    if (Supabase.instance.client.auth.currentUser == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      child: ListTile(
+        leading: Icon(
+          pendingAlerts > 0 ? Icons.notifications_active : Icons.notifications_none,
+        ),
+        title: Text(
+          pendingAlerts > 0
+              ? '$pendingAlerts alerta(s) pendiente(s)'
+              : 'Sin alertas pendientes',
+        ),
+        subtitle: const Text('Entrá a Mis alertas para ver o marcar novedades.'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () async {
+          await Navigator.pushNamed(context, AlertEventsScreen.routeName);
+          if (!mounted) return;
+          await _refreshHome();
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -117,16 +168,21 @@ class _HomeScreenState extends State<HomeScreen> {
         centerTitle: false,
         actions: [
           IconButton(
-            onPressed: _refreshProfile,
+            onPressed: _refreshHome,
             icon: const Icon(Icons.refresh),
           ),
         ],
       ),
       body: SafeArea(
-        child: FutureBuilder<UserProfile?>(
-          future: _profileFuture,
+        child: FutureBuilder<List<dynamic>>(
+          future: Future.wait([
+            _profileFuture,
+            _pendingAlertsFuture,
+          ]),
           builder: (context, snapshot) {
-            final cards = _buildCards(snapshot.data);
+            final profile = snapshot.hasData ? snapshot.data![0] as UserProfile? : null;
+            final pendingAlerts = snapshot.hasData ? snapshot.data![1] as int : 0;
+            final cards = _buildCards(profile, pendingAlerts);
 
             return ListView(
               padding: const EdgeInsets.all(20),
@@ -162,7 +218,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 16),
                 if (snapshot.connectionState == ConnectionState.waiting)
                   const LinearProgressIndicator(),
-                if (snapshot.data?.isAdmin == true)
+                if (snapshot.hasError)
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.warning),
+                      title: const Text('No se pudo actualizar el inicio'),
+                      subtitle: Text('${snapshot.error}'),
+                    ),
+                  ),
+                _buildAlertSummaryCard(pendingAlerts),
+                if (profile?.isAdmin == true)
                   const Card(
                     child: ListTile(
                       leading: Icon(Icons.verified_user),
