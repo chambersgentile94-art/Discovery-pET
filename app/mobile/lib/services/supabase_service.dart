@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/adoption_request.dart';
+import '../models/alert_event.dart';
 import '../models/alert_preference.dart';
 import '../models/animal_report.dart';
 import '../models/report_flag.dart';
@@ -241,6 +242,32 @@ class SupabaseService {
           preference.toUpsertMap(),
           onConflict: 'user_id',
         );
+  }
+
+  Future<List<AlertEvent>> fetchCurrentUserAlertEvents() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return [];
+
+    final response = await _client
+        .from('alert_events')
+        .select('*, animal_reports($_reportSelect)')
+        .eq('user_id', user.id)
+        .order('created_at', ascending: false);
+
+    return response
+        .map<AlertEvent>((item) => AlertEvent.fromMap(item))
+        .toList();
+  }
+
+  Future<void> updateAlertEventStatus({
+    required String eventId,
+    required String status,
+  }) async {
+    await _client.from('alert_events').update({
+      'status': status,
+      if (status == 'seen' || status == 'dismissed')
+        'read_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', eventId);
   }
 
   Future<String> uploadReportImage({
