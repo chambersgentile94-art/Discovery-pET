@@ -23,12 +23,24 @@ class AlertEventsScreen extends StatefulWidget {
 
 class _AlertEventsScreenState extends State<AlertEventsScreen> {
   late Future<List<AlertEvent>> _eventsFuture;
+  RealtimeChannel? _alertsChannel;
   bool _isRecalculating = false;
+  bool _isRealtimeConnected = false;
 
   @override
   void initState() {
     super.initState();
     _eventsFuture = _loadEvents();
+    _subscribeToAlertEvents();
+  }
+
+  @override
+  void dispose() {
+    final channel = _alertsChannel;
+    if (channel != null) {
+      Supabase.instance.client.removeChannel(channel);
+    }
+    super.dispose();
   }
 
   Future<List<AlertEvent>> _loadEvents() async {
@@ -36,6 +48,41 @@ class _AlertEventsScreenState extends State<AlertEventsScreen> {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return [];
     return SupabaseService().fetchCurrentUserAlertEvents();
+  }
+
+  void _subscribeToAlertEvents() {
+    if (!widget.isBackendConfigured) return;
+
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    final oldChannel = _alertsChannel;
+    if (oldChannel != null) {
+      Supabase.instance.client.removeChannel(oldChannel);
+    }
+
+    _alertsChannel = Supabase.instance.client
+        .channel('alert-events-${user.id}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'alert_events',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: user.id,
+          ),
+          callback: (_) {
+            if (!mounted) return;
+            _refresh();
+          },
+        )
+        .subscribe((status, [_]) {
+          if (!mounted) return;
+          setState(() {
+            _isRealtimeConnected = status == RealtimeSubscribeStatus.subscribed;
+          });
+        });
   }
 
   Future<void> _refresh() async {
@@ -76,6 +123,7 @@ class _AlertEventsScreenState extends State<AlertEventsScreen> {
   Future<void> _goToAuth() async {
     await Navigator.pushNamed(context, AuthScreen.routeName);
     if (!mounted) return;
+    _subscribeToAlertEvents();
     await _refresh();
   }
 
@@ -131,6 +179,27 @@ class _AlertEventsScreenState extends State<AlertEventsScreen> {
               label: const Text('Acceder'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRealtimeStatus() {
+    return Card(
+      child: ListTile(
+        leading: Icon(
+          _isRealtimeConnected ? Icons.bolt : Icons.sync_disabled,
+          color: _isRealtimeConnected ? Theme.of(context).colorScheme.primary : null,
+        ),
+        title: Text(
+          _isRealtimeConnected
+              ? 'Actualización en tiempo real activa'
+              : 'Tiempo real no conectado',
+        ),
+        subtitle: Text(
+          _isRealtimeConnected
+              ? 'Esta pantalla se actualiza sola cuando llega una alerta nueva.'
+              : 'Podés usar refrescar o recalcular alertas manualmente.',
         ),
       ),
     );
@@ -241,6 +310,8 @@ class _AlertEventsScreenState extends State<AlertEventsScreen> {
             else if (user == null)
               _buildLoggedOutState()
             else ...[
+              _buildRealtimeStatus(),
+              const SizedBox(height: 12),
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.sync),
