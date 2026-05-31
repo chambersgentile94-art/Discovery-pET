@@ -26,22 +26,83 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late Future<UserProfile?> _profileFuture;
   late Future<int> _pendingAlertsFuture;
+  RealtimeChannel? _alertsChannel;
+  int _pendingAlertsCount = 0;
 
   @override
   void initState() {
     super.initState();
     _profileFuture = SupabaseService().fetchCurrentProfile();
-    _pendingAlertsFuture = SupabaseService().fetchCurrentUserPendingAlertCount();
+    _pendingAlertsFuture = _loadPendingAlerts();
+    _subscribeToAlertEvents();
+  }
+
+  @override
+  void dispose() {
+    final channel = _alertsChannel;
+    if (channel != null) {
+      Supabase.instance.client.removeChannel(channel);
+    }
+    super.dispose();
+  }
+
+  Future<int> _loadPendingAlerts() async {
+    final count = await SupabaseService().fetchCurrentUserPendingAlertCount();
+    if (mounted) {
+      setState(() {
+        _pendingAlertsCount = count;
+      });
+    }
+    return count;
+  }
+
+  void _subscribeToAlertEvents() {
+    final oldChannel = _alertsChannel;
+    if (oldChannel != null) {
+      Supabase.instance.client.removeChannel(oldChannel);
+      _alertsChannel = null;
+    }
+
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    _alertsChannel = Supabase.instance.client
+        .channel('home-alert-events-${user.id}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'alert_events',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: user.id,
+          ),
+          callback: (_) {
+            if (!mounted) return;
+            _refreshPendingAlertCount();
+          },
+        )
+        .subscribe();
+  }
+
+  Future<void> _refreshPendingAlertCount() async {
+    final nextPendingAlertsFuture = _loadPendingAlerts();
+    setState(() {
+      _pendingAlertsFuture = nextPendingAlertsFuture;
+    });
+    await nextPendingAlertsFuture;
   }
 
   Future<void> _refreshHome() async {
     final nextProfileFuture = SupabaseService().fetchCurrentProfile();
-    final nextPendingAlertsFuture = SupabaseService().fetchCurrentUserPendingAlertCount();
+    final nextPendingAlertsFuture = _loadPendingAlerts();
 
     setState(() {
       _profileFuture = nextProfileFuture;
       _pendingAlertsFuture = nextPendingAlertsFuture;
     });
+
+    _subscribeToAlertEvents();
 
     await Future.wait([
       nextProfileFuture,
@@ -50,6 +111,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refreshProfile() => _refreshHome();
+
+  Future<void> _openAlertEvents() async {
+    await Navigator.pushNamed(context, AlertEventsScreen.routeName);
+    if (!mounted) return;
+    await _refreshHome();
+  }
 
   List<HomeActionCard> _buildCards(UserProfile? profile, int pendingAlerts) {
     final alertDescription = pendingAlerts > 0
@@ -67,17 +134,17 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.add_location_alt,
         title: 'Reportar animal',
         description: 'Publicar una mascota perdida, abandonada o vista en la calle.',
-        onTap: () => Navigator.pushNamed(context, ReportFormScreen.routeName),
+        onTap: () async {
+          await Navigator.pushNamed(context, ReportFormScreen.routeName);
+          if (!mounted) return;
+          await _refreshHome();
+        },
       ),
       HomeActionCard(
         icon: pendingAlerts > 0 ? Icons.notifications_active : Icons.notifications_none,
         title: pendingAlerts > 0 ? 'Mis alertas · $pendingAlerts' : 'Mis alertas',
         description: alertDescription,
-        onTap: () async {
-          await Navigator.pushNamed(context, AlertEventsScreen.routeName);
-          if (!mounted) return;
-          await _refreshHome();
-        },
+        onTap: _openAlertEvents,
       ),
       HomeActionCard(
         icon: Icons.settings_applications,
@@ -151,11 +218,46 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         subtitle: const Text('Entrá a Mis alertas para ver o marcar novedades.'),
         trailing: const Icon(Icons.chevron_right),
-        onTap: () async {
-          await Navigator.pushNamed(context, AlertEventsScreen.routeName);
-          if (!mounted) return;
-          await _refreshHome();
-        },
+        onTap: _openAlertEvents,
+      ),
+    );
+  }
+
+  Widget _buildAlertActionButton() {
+    return IconButton(
+      onPressed: _openAlertEvents,
+      tooltip: 'Mis alertas',
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Icon(
+            _pendingAlertsCount > 0
+                ? Icons.notifications_active
+                : Icons.notifications_none,
+          ),
+          if (_pendingAlertsCount > 0)
+            Positioned(
+              right: -7,
+              top: -7,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.error,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                child: Text(
+                  _pendingAlertsCount > 99 ? '99+' : '$_pendingAlertsCount',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onError,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -167,6 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Discovery-pET'),
         centerTitle: false,
         actions: [
+          _buildAlertActionButton(),
           IconButton(
             onPressed: _refreshHome,
             icon: const Icon(Icons.refresh),
@@ -181,7 +284,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ]),
           builder: (context, snapshot) {
             final profile = snapshot.hasData ? snapshot.data![0] as UserProfile? : null;
-            final pendingAlerts = snapshot.hasData ? snapshot.data![1] as int : 0;
+            final pendingAlerts = snapshot.hasData
+                ? snapshot.data![1] as int
+                : _pendingAlertsCount;
             final cards = _buildCards(profile, pendingAlerts);
 
             return ListView(
@@ -251,7 +356,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.pushNamed(context, ReportFormScreen.routeName),
+        onPressed: () async {
+          await Navigator.pushNamed(context, ReportFormScreen.routeName);
+          if (!mounted) return;
+          await _refreshHome();
+        },
         icon: const Icon(Icons.add),
         label: const Text('Reportar'),
       ),
