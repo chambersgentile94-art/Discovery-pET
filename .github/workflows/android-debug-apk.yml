@@ -1,0 +1,67 @@
+name: Android Debug APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_name:
+        description: 'Nombre opcional para identificar el build'
+        required: false
+        default: 'manual'
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/mobile/**'
+      - '.github/workflows/android-debug-apk.yml'
+
+jobs:
+  build-debug-apk:
+    name: Build Android debug APK
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: app/mobile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze project
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build debug APK
+        run: |
+          flutter build apk --debug \
+            --dart-define=DP_BACKEND_URL=${{ vars.DP_BACKEND_URL || 'https://dsuwojpgiuvkyvwbuyte.supabase.co' }} \
+            --dart-define=DP_BACKEND_PUBLIC_KEY=${{ secrets.DP_BACKEND_PUBLIC_KEY }}
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-debug.apk dist/discovery-pet-debug.apk
+          printf "Discovery-pET Debug APK\nCommit: $GITHUB_SHA\nBuild: ${{ github.event.inputs.build_name || 'auto' }}\n" > dist/README.txt
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: discovery-pet-debug-apk
+          path: |
+            app/mobile/dist/discovery-pet-debug.apk
+            app/mobile/dist/README.txt
+          retention-days: 14
