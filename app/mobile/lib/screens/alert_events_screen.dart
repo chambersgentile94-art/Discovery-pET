@@ -25,6 +25,7 @@ class _AlertEventsScreenState extends State<AlertEventsScreen> {
   late Future<List<AlertEvent>> _eventsFuture;
   RealtimeChannel? _alertsChannel;
   bool _isRecalculating = false;
+  bool _isMarkingAllSeen = false;
   bool _isRealtimeConnected = false;
 
   @override
@@ -120,6 +121,33 @@ class _AlertEventsScreenState extends State<AlertEventsScreen> {
     }
   }
 
+  Future<void> _markAllAsSeen() async {
+    setState(() {
+      _isMarkingAllSeen = true;
+    });
+
+    try {
+      await SupabaseService().markAllCurrentUserAlertEventsAsSeen();
+      await _refresh();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Alertas pendientes marcadas como vistas.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudieron marcar las alertas: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isMarkingAllSeen = false;
+        });
+      }
+    }
+  }
+
   Future<void> _goToAuth() async {
     await Navigator.pushNamed(context, AuthScreen.routeName);
     if (!mounted) return;
@@ -200,6 +228,40 @@ class _AlertEventsScreenState extends State<AlertEventsScreen> {
           _isRealtimeConnected
               ? 'Esta pantalla se actualiza sola cuando llega una alerta nueva.'
               : 'Podés usar refrescar o recalcular alertas manualmente.',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBulkActions(int pendingCount) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Acciones rápidas',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: pendingCount == 0 || _isMarkingAllSeen
+                    ? null
+                    : _markAllAsSeen,
+                icon: _isMarkingAllSeen
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.done_all),
+                label: const Text('Marcar pendientes como vistas'),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -373,6 +435,8 @@ class _AlertEventsScreenState extends State<AlertEventsScreen> {
                           subtitle: Text('Total histórico: ${events.length}'),
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      _buildBulkActions(pendingCount),
                       const SizedBox(height: 12),
                       ...events.map(_buildEvent),
                     ],
