@@ -5,6 +5,7 @@ import '../services/supabase_service.dart';
 import '../widgets/home_action_card.dart';
 import 'adoption_requests_screen.dart';
 import 'adoption_screen.dart';
+import 'alert_events_screen.dart';
 import 'alert_preferences_screen.dart';
 import 'map_screen.dart';
 import 'moderation_screen.dart';
@@ -53,7 +54,13 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       HomeActionCard(
         icon: Icons.notifications_active,
-        title: 'Alertas por zona',
+        title: 'Mis alertas',
+        description: 'Ver reportes nuevos que coinciden con tu zona configurada.',
+        onTap: () => Navigator.pushNamed(context, AlertEventsScreen.routeName),
+      ),
+      HomeActionCard(
+        icon: Icons.settings_applications,
+        title: 'Configurar alertas',
         description: 'Elegir radio, ubicación y categorías para futuras notificaciones.',
         onTap: () => Navigator.pushNamed(context, AlertPreferencesScreen.routeName),
       ),
