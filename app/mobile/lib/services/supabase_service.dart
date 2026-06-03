@@ -305,6 +305,43 @@ class SupabaseService {
         .eq('status', 'pending');
   }
 
+  Future<void> upsertCurrentUserDevice({
+    required String pushToken,
+    required String platform,
+    String? deviceId,
+    String? appVersion,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+
+    await _client.from('user_devices').upsert(
+      {
+        'user_id': user.id,
+        'platform': platform,
+        'device_id': deviceId,
+        'push_token': pushToken,
+        'app_version': appVersion,
+        'is_active': true,
+        'last_seen_at': DateTime.now().toUtc().toIso8601String(),
+      },
+      onConflict: 'push_token',
+    );
+  }
+
+  Future<void> deactivateCurrentUserDeviceToken(String pushToken) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+
+    await _client
+        .from('user_devices')
+        .update({
+          'is_active': false,
+          'last_seen_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('user_id', user.id)
+        .eq('push_token', pushToken);
+  }
+
   Future<String> uploadReportImage({
     required String reportId,
     required Uint8List bytes,
