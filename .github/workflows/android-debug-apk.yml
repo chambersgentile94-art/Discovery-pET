@@ -36,6 +36,14 @@ jobs:
       - name: Flutter version
         run: flutter --version
 
+      - name: Restore Firebase Android config
+        run: |
+          if [ -z "${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_B64 }}" ]; then
+            echo "Missing FIREBASE_GOOGLE_SERVICES_JSON_B64 secret"
+            exit 1
+          fi
+          echo "${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_B64 }}" | base64 --decode > android/app/google-services.json
+
       - name: Install dependencies
         run: flutter pub get
 
