@@ -28,9 +28,34 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("internal") {
+            val storePath = System.getenv("DP_ANDROID_KEYSTORE_PATH")
+            val storePasswordValue = System.getenv("DP_ANDROID_KEYSTORE_PASSWORD")
+            val keyAliasValue = System.getenv("DP_ANDROID_KEY_ALIAS")
+            val keyPasswordValue = System.getenv("DP_ANDROID_KEY_PASSWORD")
+
+            if (!storePath.isNullOrBlank() &&
+                !storePasswordValue.isNullOrBlank() &&
+                !keyAliasValue.isNullOrBlank() &&
+                !keyPasswordValue.isNullOrBlank()
+            ) {
+                storeFile = file(storePath)
+                storePassword = storePasswordValue
+                keyAlias = keyAliasValue
+                keyPassword = keyPasswordValue
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            val hasInternalSigning = !System.getenv("DP_ANDROID_KEYSTORE_PATH").isNullOrBlank()
+            signingConfig = if (hasInternalSigning) {
+                signingConfigs.getByName("internal")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
