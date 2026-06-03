@@ -1,0 +1,77 @@
+name: Android Internal Signed APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_name:
+        description: 'Nombre opcional para identificar el build interno'
+        required: false
+        default: 'internal-manual'
+
+jobs:
+  build-internal-apk:
+    name: Build Android internal signed APK
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: app/mobile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Restore Firebase config
+        run: |
+          echo "${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_B64 }}" | base64 --decode > android/app/google-services.json
+
+      - name: Restore signing file
+        run: |
+          echo "${{ secrets.DP_ANDROID_KEYSTORE_B64 }}" | base64 --decode > android/app/discovery-pet-internal.jks
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze project
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build signed release APK
+        env:
+          DP_ANDROID_KEYSTORE_PATH: discovery-pet-internal.jks
+          DP_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.DP_ANDROID_KEYSTORE_PASSWORD }}
+          DP_ANDROID_KEY_ALIAS: ${{ secrets.DP_ANDROID_KEY_ALIAS }}
+          DP_ANDROID_KEY_PASSWORD: ${{ secrets.DP_ANDROID_KEY_PASSWORD }}
+        run: |
+          flutter build apk --release \
+            --dart-define=DP_BACKEND_URL=${{ vars.DP_BACKEND_URL || 'https://dsuwojpgiuvkyvwbuyte.supabase.co' }} \
+            --dart-define=DP_BACKEND_PUBLIC_KEY=${{ secrets.DP_BACKEND_PUBLIC_KEY }}
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk dist/discovery-pet-internal.apk
+          printf "Discovery-pET Internal Signed APK\nCommit: $GITHUB_SHA\nBuild: ${{ github.event.inputs.build_name || 'internal-auto' }}\n" > dist/README.txt
+
+      - name: Upload internal APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: discovery-pet-internal-signed-apk
+          path: |
+            app/mobile/dist/discovery-pet-internal.apk
+            app/mobile/dist/README.txt
+          retention-days: 30
