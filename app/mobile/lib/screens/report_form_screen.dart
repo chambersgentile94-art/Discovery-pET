@@ -289,7 +289,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _animalType,
+              initialValue: _animalType,
               decoration: const InputDecoration(
                 labelText: 'Tipo de animal',
                 border: OutlineInputBorder(),
@@ -303,7 +303,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
-              value: _category,
+              initialValue: _category,
               decoration: const InputDecoration(
                 labelText: 'Categoría',
                 border: OutlineInputBorder(),
@@ -352,7 +352,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
-              value: _urgency,
+              initialValue: _urgency,
               decoration: const InputDecoration(
                 labelText: 'Urgencia',
                 border: OutlineInputBorder(),
