@@ -35,11 +35,14 @@ jobs:
 
       - name: Restore Firebase config
         run: |
-          echo "${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_B64 }}" | base64 --decode > android/app/google-services.json
+          printf '%s' '${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_B64 }}' | base64 --decode > android/app/google-services.json
+          python -m json.tool android/app/google-services.json > /dev/null
+          test -s android/app/google-services.json
 
       - name: Restore signing file
         run: |
-          echo "${{ secrets.DP_ANDROID_KEYSTORE_B64 }}" | base64 --decode > android/app/discovery-pet-internal.jks
+          printf '%s' '${{ secrets.DP_ANDROID_KEYSTORE_B64 }}' | base64 --decode > android/app/discovery-pet-internal.jks
+          test -s android/app/discovery-pet-internal.jks
 
       - name: Install dependencies
         run: flutter pub get
