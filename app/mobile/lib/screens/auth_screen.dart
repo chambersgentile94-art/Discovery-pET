@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
+import '../services/push_notification_service.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({
@@ -34,6 +35,14 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
+  Future<void> _registerPushDevice() async {
+    try {
+      await PushNotificationService().registerCurrentDevice();
+    } catch (_) {
+      // No bloquea el login. Si FCM falla, se puede reintentar al abrir la app.
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -65,6 +74,8 @@ class _AuthScreenState extends State<AuthScreen> {
           fullName: _fullNameController.text,
         );
       }
+
+      await _registerPushDevice();
 
       if (!mounted) return;
 
