@@ -96,8 +96,11 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     final report = _report;
     if (report == null || report.id == null) return;
 
-    setState(() => _updatesFuture = _service.fetchReportUpdates(report.id!));
-    await _updatesFuture;
+    final nextUpdatesFuture = _service.fetchReportUpdates(report.id!);
+    setState(() {
+      _updatesFuture = nextUpdatesFuture;
+    });
+    await nextUpdatesFuture;
   }
 
   Future<void> _saveUpdate() async {
@@ -371,7 +374,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: _selectedStatus,
+                      initialValue: _selectedStatus,
                       decoration: const InputDecoration(
                         labelText: 'Estado actual',
                         border: OutlineInputBorder(),
