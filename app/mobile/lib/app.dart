@@ -35,7 +35,7 @@ class DiscoveryPetApp extends StatelessWidget {
       ),
       initialRoute: HomeScreen.routeName,
       routes: {
-        HomeScreen.routeName: (_) => const HomeScreen(),
+        HomeScreen.routeName: (_) => HomeScreen(isBackendConfigured: config.hasBackendConfig),
         AuthScreen.routeName: (_) => AuthScreen(isBackendConfigured: config.hasBackendConfig),
         MapScreen.routeName: (_) => MapScreen(isBackendConfigured: config.hasBackendConfig),
         ReportFormScreen.routeName: (_) => const ReportFormScreen(),
