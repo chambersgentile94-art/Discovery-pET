@@ -254,7 +254,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: _role,
+                    initialValue: _role,
                     decoration: const InputDecoration(
                       labelText: 'Tipo de participación',
                       border: OutlineInputBorder(),
