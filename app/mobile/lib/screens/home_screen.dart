@@ -110,8 +110,6 @@ class _HomeScreenState extends State<HomeScreen> {
     ]);
   }
 
-  Future<void> _refreshProfile() => _refreshHome();
-
   Future<void> _openAlertEvents() async {
     await Navigator.pushNamed(context, AlertEventsScreen.routeName);
     if (!mounted) return;
