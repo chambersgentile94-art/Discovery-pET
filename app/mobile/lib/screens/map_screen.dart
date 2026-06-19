@@ -40,8 +40,11 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _refresh() async {
-    setState(() => _reportsFuture = _loadReports());
-    await _reportsFuture;
+    final nextReportsFuture = _loadReports();
+    setState(() {
+      _reportsFuture = nextReportsFuture;
+    });
+    await nextReportsFuture;
   }
 
   List<AnimalReport> _applyFilters(List<AnimalReport> reports) {
@@ -191,7 +194,7 @@ class _MapScreenState extends State<MapScreen> {
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _animalFilter,
+              initialValue: _animalFilter,
               decoration: const InputDecoration(
                 labelText: 'Animal',
                 border: OutlineInputBorder(),
@@ -206,9 +209,9 @@ class _MapScreenState extends State<MapScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _categoryFilter,
+              initialValue: _categoryFilter,
               decoration: const InputDecoration(
-                labelText: 'Categoría',
+                labelText: 'Categoria',
                 border: OutlineInputBorder(),
               ),
               items: const [
@@ -217,14 +220,14 @@ class _MapScreenState extends State<MapScreen> {
                 DropdownMenuItem(value: 'seen', child: Text('Vistos')),
                 DropdownMenuItem(value: 'abandoned', child: Text('Abandonados')),
                 DropdownMenuItem(value: 'rescued', child: Text('Resguardados')),
-                DropdownMenuItem(value: 'adoption', child: Text('En adopción')),
+                DropdownMenuItem(value: 'adoption', child: Text('En adopcion')),
                 DropdownMenuItem(value: 'injured', child: Text('Heridos')),
               ],
               onChanged: (value) => setState(() => _categoryFilter = value ?? 'all'),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _urgencyFilter,
+              initialValue: _urgencyFilter,
               decoration: const InputDecoration(
                 labelText: 'Urgencia',
                 border: OutlineInputBorder(),
@@ -258,7 +261,7 @@ class _MapScreenState extends State<MapScreen> {
         ),
         Chip(
           avatar: Icon(Icons.location_on, color: Colors.pink),
-          label: Text('Adopción'),
+          label: Text('Adopcion'),
         ),
         Chip(
           avatar: Icon(Icons.location_on, color: Colors.deepPurple),
@@ -296,12 +299,12 @@ class _MapScreenState extends State<MapScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '🗺️ Mapa de reportes',
+                    'Mapa de reportes',
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                   SizedBox(height: 12),
                   Text(
-                    'Tocá un marcador para ver el detalle del caso. Los reportes se cargan desde Supabase.',
+                    'Toca un marcador para ver el detalle del caso. Los reportes se cargan desde Supabase.',
                   ),
                 ],
               ),
@@ -316,7 +319,7 @@ class _MapScreenState extends State<MapScreen> {
                 child: ListTile(
                   leading: Icon(Icons.warning),
                   title: Text('Backend no configurado'),
-                  subtitle: Text('Ejecutá la app con los parámetros del proyecto para leer reportes.'),
+                  subtitle: Text('Ejecuta la app con los parametros del proyecto para leer reportes.'),
                 ),
               )
             else
@@ -348,7 +351,7 @@ class _MapScreenState extends State<MapScreen> {
                       child: ListTile(
                         leading: Icon(Icons.pets),
                         title: Text('Sin reportes para estos filtros'),
-                        subtitle: Text('Probá limpiar los filtros o publicar un nuevo reporte.'),
+                        subtitle: Text('Proba limpiar los filtros o publicar un nuevo reporte.'),
                       ),
                     );
                   }
