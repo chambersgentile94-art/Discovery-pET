@@ -33,6 +33,14 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Validate backend config
+        env:
+          DP_BACKEND_URL: ${{ vars.DP_BACKEND_URL || 'https://dsuwojpgiuvkyvwbuyte.supabase.co' }}
+          DP_BACKEND_PUBLIC_KEY: ${{ secrets.DP_BACKEND_PUBLIC_KEY }}
+        run: |
+          test -n "$DP_BACKEND_URL" || (echo "DP_BACKEND_URL vacio" && exit 1)
+          test -n "$DP_BACKEND_PUBLIC_KEY" || (echo "DP_BACKEND_PUBLIC_KEY vacio o no cargado en GitHub Secrets" && exit 1)
+
       - name: Restore Firebase config
         run: |
           printf '%s' '${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_B64 }}' | base64 --decode > android/app/google-services.json
@@ -59,10 +67,12 @@ jobs:
           DP_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.DP_ANDROID_KEYSTORE_PASSWORD }}
           DP_ANDROID_KEY_ALIAS: ${{ secrets.DP_ANDROID_KEY_ALIAS }}
           DP_ANDROID_KEY_PASSWORD: ${{ secrets.DP_ANDROID_KEY_PASSWORD }}
+          DP_BACKEND_URL: ${{ vars.DP_BACKEND_URL || 'https://dsuwojpgiuvkyvwbuyte.supabase.co' }}
+          DP_BACKEND_PUBLIC_KEY: ${{ secrets.DP_BACKEND_PUBLIC_KEY }}
         run: |
           flutter build apk --release \
-            --dart-define=DP_BACKEND_URL=${{ vars.DP_BACKEND_URL || 'https://dsuwojpgiuvkyvwbuyte.supabase.co' }} \
-            --dart-define=DP_BACKEND_PUBLIC_KEY=${{ secrets.DP_BACKEND_PUBLIC_KEY }}
+            --dart-define=DP_BACKEND_URL="$DP_BACKEND_URL" \
+            --dart-define=DP_BACKEND_PUBLIC_KEY="$DP_BACKEND_PUBLIC_KEY"
 
       - name: Prepare artifact
         run: |
