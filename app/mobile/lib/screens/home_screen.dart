@@ -15,9 +15,14 @@ import 'profile_screen.dart';
 import 'report_form_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({
+    super.key,
+    required this.isBackendConfigured,
+  });
 
   static const routeName = '/';
+
+  final bool isBackendConfigured;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -32,7 +37,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _profileFuture = SupabaseService().fetchCurrentProfile();
+    _profileFuture = widget.isBackendConfigured
+        ? SupabaseService().fetchCurrentProfile()
+        : Future<UserProfile?>.value();
     _pendingAlertsFuture = _loadPendingAlerts();
     _subscribeToAlertEvents();
   }
@@ -40,13 +47,15 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     final channel = _alertsChannel;
-    if (channel != null) {
+    if (widget.isBackendConfigured && channel != null) {
       Supabase.instance.client.removeChannel(channel);
     }
     super.dispose();
   }
 
   Future<int> _loadPendingAlerts() async {
+    if (!widget.isBackendConfigured) return 0;
+
     final count = await SupabaseService().fetchCurrentUserPendingAlertCount();
     if (mounted) {
       setState(() {
@@ -57,6 +66,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _subscribeToAlertEvents() {
+    if (!widget.isBackendConfigured) return;
+
     final oldChannel = _alertsChannel;
     if (oldChannel != null) {
       Supabase.instance.client.removeChannel(oldChannel);
@@ -94,6 +105,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refreshHome() async {
+    if (!widget.isBackendConfigured) {
+      setState(() {
+        _pendingAlertsCount = 0;
+        _profileFuture = Future<UserProfile?>.value();
+        _pendingAlertsFuture = Future<int>.value(0);
+      });
+      return;
+    }
+
     final nextProfileFuture = SupabaseService().fetchCurrentProfile();
     final nextPendingAlertsFuture = _loadPendingAlerts();
 
@@ -200,6 +220,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildAlertSummaryCard(int pendingAlerts) {
+    if (!widget.isBackendConfigured) {
+      return const SizedBox.shrink();
+    }
+
     if (Supabase.instance.client.auth.currentUser == null) {
       return const SizedBox.shrink();
     }
@@ -223,7 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildAlertActionButton() {
     return IconButton(
-      onPressed: _openAlertEvents,
+      onPressed: widget.isBackendConfigured ? _openAlertEvents : null,
       tooltip: 'Mis alertas',
       icon: Stack(
         clipBehavior: Clip.none,
@@ -319,6 +343,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
+                if (!widget.isBackendConfigured)
+                  const Card(
+                    child: ListTile(
+                      leading: Icon(Icons.warning),
+                      title: Text('Backend no configurado'),
+                      subtitle: Text('La app está ejecutándose en modo local de prueba.'),
+                    ),
+                  ),
                 if (snapshot.connectionState == ConnectionState.waiting)
                   const LinearProgressIndicator(),
                 if (snapshot.hasError)
